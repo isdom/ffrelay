@@ -1,0 +1,2 @@
+Main-Class: org.jocean.ffrelay.booter.Booter
+Class-Path: ../../etc/ 
