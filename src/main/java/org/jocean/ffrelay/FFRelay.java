@@ -92,6 +92,10 @@ public class FFRelay {
                         _lastOutputTime = System.currentTimeMillis();
                         _lastOutput = line;
                         OUT.info(line);
+                        if (line.indexOf("invalid dropping") >= 0) {
+                            OUT.warn("meet 'invalid dropping' output, so try re-start ffmpeg");
+                            _currentProcess.destroyForcibly();
+                        }
                     }});
             } catch (Exception e) {
                 OUT.warn("relay stopped bcs of {}", ExceptionUtils.exception2detail(e));
