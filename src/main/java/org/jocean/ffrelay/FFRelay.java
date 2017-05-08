@@ -95,7 +95,14 @@ public class FFRelay {
                         if (line.indexOf("invalid dropping") >= 0) {
                             OUT.warn("meet 'invalid dropping' output, so try re-start ffmpeg");
                             _currentProcess.destroyForcibly();
+                            return;
                         }
+                        if (line.indexOf("Non-monotonous DTS") >= 0) {
+                            OUT.warn("meet 'Non-monotonous DTS' output, so try re-start ffmpeg");
+                            _currentProcess.destroyForcibly();
+                            return;
+                        }
+                        
                     }});
             } catch (Exception e) {
                 OUT.warn("relay stopped bcs of {}", ExceptionUtils.exception2detail(e));
