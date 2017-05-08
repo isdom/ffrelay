@@ -5,6 +5,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.CharStreams;
 import net.bramp.ffmpeg.io.ProcessUtils;
+import net.bramp.ffmpeg.progress.Progress;
 
 import javax.annotation.Nonnull;
 
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -113,7 +115,13 @@ abstract class FFcommon {
       // TODO Move the copy onto a thread, so that FFmpegProgressListener can be on this thread.
 
       // Now block reading ffmpeg's stdout. We are effectively throwing away the output.
-      CharStreams.copy(wrapInReader(p), System.out); // TODO Should I be outputting to stdout?
+      // CharStreams.copy(wrapInReader(p), System.out); // TODO Should I be outputting to stdout?
+
+      final BufferedReader in = wrapInReader(p);
+      String line;
+      while ((line = in.readLine()) != null) {
+//          LOG.info("{}", line);
+      }
 
       throwOnError(p);
 
@@ -128,13 +136,13 @@ abstract class FFcommon {
    * @param args The arguments to pass to the binary.
    * @throws IOException If there is a problem executing the binary.
    */
-  public void run(final List<String> args, final ProcessAware processAware) throws IOException {
+  public void run(final List<String> args, final ProcessMonitor monitor) throws IOException {
     checkNotNull(args);
 
     final Process p = runFunc.run(path(args));
     
     try {
-        processAware.setProcess(p);
+        monitor.setProcess(p);
     } catch (Exception e) {
     }
     
@@ -142,7 +150,17 @@ abstract class FFcommon {
       // TODO Move the copy onto a thread, so that FFmpegProgressListener can be on this thread.
 
       // Now block reading ffmpeg's stdout. We are effectively throwing away the output.
-      CharStreams.copy(wrapInReader(p), System.out); // TODO Should I be outputting to stdout?
+      // CharStreams.copy(wrapInReader(p), System.out); // TODO Should I be outputting to stdout?
+
+      final BufferedReader in = wrapInReader(p);
+      
+      String line;
+      while ((line = in.readLine()) != null) {
+          try {
+              monitor.onOutput(line);
+          } catch (Exception e) {
+          }
+      }
       
       throwOnError(p);
 

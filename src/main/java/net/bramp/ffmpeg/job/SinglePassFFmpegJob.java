@@ -2,7 +2,7 @@ package net.bramp.ffmpeg.job;
 
 import com.google.common.base.Throwables;
 import net.bramp.ffmpeg.FFmpeg;
-import net.bramp.ffmpeg.ProcessAware;
+import net.bramp.ffmpeg.ProcessMonitor;
 import net.bramp.ffmpeg.builder.FFmpegBuilder;
 import net.bramp.ffmpeg.progress.ProgressListener;
 
@@ -49,7 +49,7 @@ public class SinglePassFFmpegJob extends FFmpegJob {
   }
 
   @Override
-  public void run(final ProcessAware processAware) {
+  public void run(final ProcessMonitor processAware) {
 
       state = State.RUNNING;
 

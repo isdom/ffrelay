@@ -185,9 +185,9 @@ public class FFmpeg extends FFcommon {
   }
 
   @Override
-  public void run(List<String> args, final ProcessAware processAware) throws IOException {
+  public void run(List<String> args, final ProcessMonitor monitor) throws IOException {
     checkIfFFmpeg();
-    super.run(args, processAware);
+    super.run(args, monitor);
   }
   
   public void run(FFmpegBuilder builder) throws IOException {
@@ -211,7 +211,7 @@ public class FFmpeg extends FFcommon {
 
   public void run(FFmpegBuilder builder, 
           @Nullable ProgressListener listener,
-          final ProcessAware processAware) throws IOException {
+          final ProcessMonitor monitor) throws IOException {
       checkNotNull(builder);
 
       if (listener != null) {
@@ -219,10 +219,10 @@ public class FFmpeg extends FFcommon {
           progressParser.start();
           builder = builder.addProgress(progressParser.getUri());
 
-          run(builder.build(), processAware);
+          run(builder.build(), monitor);
         }
       } else {
-        run(builder.build(), processAware);
+        run(builder.build(), monitor);
       }
     }
   

@@ -1,7 +1,7 @@
 package net.bramp.ffmpeg.job;
 
 import net.bramp.ffmpeg.FFmpeg;
-import net.bramp.ffmpeg.ProcessAware;
+import net.bramp.ffmpeg.ProcessMonitor;
 import net.bramp.ffmpeg.progress.ProgressListener;
 
 import javax.annotation.Nullable;
@@ -36,5 +36,5 @@ public abstract class FFmpegJob implements Runnable {
     return state;
   }
   
-  public abstract void run(final ProcessAware processAware);
+  public abstract void run(final ProcessMonitor processAware);
 }

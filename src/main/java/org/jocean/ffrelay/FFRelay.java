@@ -2,7 +2,6 @@ package org.jocean.ffrelay;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jocean.idiom.ExceptionUtils;
 import org.slf4j.Logger;
@@ -10,16 +9,19 @@ import org.slf4j.LoggerFactory;
 
 import net.bramp.ffmpeg.FFmpeg;
 import net.bramp.ffmpeg.FFmpegExecutor;
-import net.bramp.ffmpeg.ProcessAware;
+import net.bramp.ffmpeg.ProcessMonitor;
 import net.bramp.ffmpeg.builder.FFmpegBuilder;
+import net.bramp.ffmpeg.builder.FFmpegBuilder.Verbosity;
 import net.bramp.ffmpeg.job.FFmpegJob;
 import net.bramp.ffmpeg.progress.Progress;
 import net.bramp.ffmpeg.progress.ProgressListener;
 
 public class FFRelay {
-    private static final Logger LOG = LoggerFactory
-            .getLogger(FFRelay.class);
+//    private static final Logger LOG = LoggerFactory
+//            .getLogger(FFRelay.class);
 
+    private final Logger OUT;
+    
 //	public static void main(String[] args) throws Exception {
 //	    final FFRelay relay = new FFRelay(new FFmpeg("/usr/local/bin/ffmpeg"),
 //            //"rtmp://rlive.jia.360.cn/live_jia_public/36150701675", 
@@ -31,16 +33,17 @@ public class FFRelay {
 //	    relay.stop();
 //    }
 
-	public FFRelay(final FFmpeg ffmpeg, final char mark, final String source, final String dest) {
+	public FFRelay(final FFmpeg ffmpeg, final String mark, final String source, final String dest) {
 	    this._ffmpeg = ffmpeg;
 	    this._mark = mark;
 	    this._source = source;
 	    this._dest = dest;
+	    this.OUT = LoggerFactory.getLogger(mark);
     }
 	
 	public synchronized void start() {
 	    if (this._running) {
-	        LOG.warn("ffrelay has already started");
+	        OUT.warn("ffrelay has already started");
 	        return;
 	    }
 	    
@@ -54,9 +57,10 @@ public class FFRelay {
 	
 	private void doRelay() {
         while (this._running) {
-            LOG.info("relay from {} --> to {}", this._source, this._dest);
+            OUT.info("relay from {} --> to {}", this._source, this._dest);
             try {
                 final FFmpegBuilder builder =  new FFmpegBuilder()
+                    .setVerbosity(Verbosity.INFO)
                     .setInput(this._source)
                     .addOutput(this._dest)
                         .setFormat("flv")
@@ -64,28 +68,32 @@ public class FFRelay {
                         .setVideoCodec("copy")
                     .done();
                     
-                final AtomicInteger cnt = new AtomicInteger(0);
                 final FFmpegExecutor executor = new FFmpegExecutor(this._ffmpeg);
                 final FFmpegJob job = executor.createJob(builder, new ProgressListener() {
                     @Override
                     public void progress(final Progress progress) {
-                        System.out.print(_mark);
-                        if (cnt.incrementAndGet() % 80 == 0) {
-                            System.out.println();
-                        }
+//                        System.out.print(_mark);
+//                        if (cnt.incrementAndGet() % 80 == 0) {
+//                            System.out.println();
+//                        }
                     }
                 });
                 
-                job.run(new ProcessAware() {
+                job.run(new ProcessMonitor() {
                     @Override
                     public void setProcess(final Process p) {
                         _currentProcess = p;
-                        LOG.info("current process has been set: {}", _currentProcess);
+                        OUT.info("current process has been set: {}", _currentProcess);
+                    }
+
+                    @Override
+                    public void onOutput(final String line) {
+                        OUT.info(line);
                     }});
             } catch (Exception e) {
-                LOG.warn("relay stopped bcs of {}", ExceptionUtils.exception2detail(e));
+                OUT.warn("relay stopped bcs of {}", ExceptionUtils.exception2detail(e));
                 if (this._running) {
-                    LOG.info("restart relaying...");
+                    OUT.info("restart relaying...");
                 }
             }
         }
@@ -98,15 +106,15 @@ public class FFRelay {
 	            this._running = false;
 	            p.destroyForcibly();
 	        } else {
-	            LOG.warn("current process is null");
+	            OUT.warn("current process is null");
 	        }
 	        this._runner.shutdownNow();
 	    } else {
-            LOG.warn("FFRelay not running.");
+            OUT.warn("FFRelay not running.");
 	    }
 	}
 
-    private final char _mark;
+    private final String _mark;
 	private final FFmpeg _ffmpeg;
 	private final String _source;
 	private final String _dest;
