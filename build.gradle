@@ -25,6 +25,8 @@ dependencies {
     compile 'org.apache.commons:commons-lang3:3.5'
     compile 'com.google.code.gson:gson:2.8.0'
     compile 'org.modelmapper:modelmapper:0.7.8'
+    
+    compile 'joda-time:joda-time:2.9.9'
         
     /* jocean */
     compile 'org.jocean:jocean-idiom:0.1.4-SNAPSHOT'

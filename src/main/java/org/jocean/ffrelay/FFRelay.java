@@ -4,6 +4,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.jocean.idiom.ExceptionUtils;
+import org.joda.time.Period;
+import org.joda.time.format.PeriodFormatter;
+import org.joda.time.format.PeriodFormatterBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,28 +20,30 @@ import net.bramp.ffmpeg.progress.Progress;
 import net.bramp.ffmpeg.progress.ProgressListener;
 
 public class FFRelay {
-//    private static final Logger LOG = LoggerFactory
-//            .getLogger(FFRelay.class);
-
     private final Logger OUT;
-    
-//	public static void main(String[] args) throws Exception {
-//	    final FFRelay relay = new FFRelay(new FFmpeg("/usr/local/bin/ffmpeg"),
-//            //"rtmp://rlive.jia.360.cn/live_jia_public/36150701675", 
-//            "rtmp://live.iplusmed.com/demo/room8", 
-//            "rtmp://video-center.alivecdn.com/demo/room1?vhost=vod.iplusmed.com");
-//	    
-//	    relay.start();
-//	    Thread.sleep(1000 * 5);
-//	    relay.stop();
-//    }
+    private static final PeriodFormatter PERIODFMT = new PeriodFormatterBuilder()
+            .appendYears()
+            .appendSuffix(" year ")
+            .appendMonths()
+            .appendSuffix(" month ")
+            .appendWeeks()
+            .appendSuffix(" week ")
+            .appendDays()
+            .appendSuffix(" day ")
+            .appendHours()
+            .appendSuffix(" hour ")
+            .appendMinutes()
+            .appendSuffix(" minute ")
+            .appendSeconds()
+            .appendSuffix(" s")
+            .toFormatter();
 
-	public FFRelay(final FFmpeg ffmpeg, final String mark, final String source, final String dest) {
+	public FFRelay(final FFmpeg ffmpeg, final String name, final String source, final String dest) {
 	    this._ffmpeg = ffmpeg;
-	    this._mark = mark;
+	    this._name = name;
 	    this._source = source;
 	    this._dest = dest;
-	    this.OUT = LoggerFactory.getLogger(mark);
+	    this.OUT = LoggerFactory.getLogger(name);
     }
 	
 	public synchronized void start() {
@@ -72,10 +77,6 @@ public class FFRelay {
                 final FFmpegJob job = executor.createJob(builder, new ProgressListener() {
                     @Override
                     public void progress(final Progress progress) {
-//                        System.out.print(_mark);
-//                        if (cnt.incrementAndGet() % 80 == 0) {
-//                            System.out.println();
-//                        }
                     }
                 });
                 
@@ -88,6 +89,8 @@ public class FFRelay {
 
                     @Override
                     public void onOutput(final String line) {
+                        _lastOutputTime = System.currentTimeMillis();
+                        _lastOutput = line;
                         OUT.info(line);
                     }});
             } catch (Exception e) {
@@ -114,7 +117,23 @@ public class FFRelay {
 	    }
 	}
 
-    private final String _mark;
+    public String getName() {
+        return this._name;
+    }
+    
+    public String getLastOutputTime() {
+        final Period period = new Period(System.currentTimeMillis() - _lastOutputTime);
+        return PERIODFMT.print(period.normalizedStandard()) + " before";
+    }
+    
+    public String getLastOutput() {
+        return this._lastOutput;
+    }
+    
+    private volatile long _lastOutputTime = 0;
+    private volatile String _lastOutput;
+    
+    private final String _name;
 	private final FFmpeg _ffmpeg;
 	private final String _source;
 	private final String _dest;

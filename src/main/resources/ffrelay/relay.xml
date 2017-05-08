@@ -4,13 +4,22 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-    <bean class="org.jocean.ffrelay.FFRelay"
+    <bean id="relay" class="org.jocean.ffrelay.FFRelay"
         init-method="start"
         destroy-method="stop">
         <constructor-arg ref="ffmpeg"/>
-        <constructor-arg name="mark" value="${mark:default}"/>
+        <constructor-arg name="name" value="${name}"/>
         <constructor-arg name="source" value="${from}"/>
         <constructor-arg name="dest" value="${to}"/>
+    </bean>
+    
+    <bean class="org.springframework.jmx.export.MBeanExporter"
+          lazy-init="false">
+        <property name="beans">
+            <map>
+                <entry key="ffrelay:name=${name}"    value-ref="relay"/>
+            </map>
+        </property>
     </bean>
      
 </beans>
