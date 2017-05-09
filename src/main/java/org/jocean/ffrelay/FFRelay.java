@@ -1,5 +1,6 @@
 package org.jocean.ffrelay;
 
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -92,6 +93,9 @@ public class FFRelay {
                         _lastOutputTime = System.currentTimeMillis();
                         _lastOutput = line;
                         OUT.info(line);
+                        if (null!=_status) {
+                            _status.put(_name, line);
+                        }
                         if (line.indexOf("invalid dropping") >= 0) {
                             OUT.warn("meet 'invalid dropping' output, so try re-start ffmpeg");
                             _currentProcess.destroyForcibly();
@@ -141,6 +145,10 @@ public class FFRelay {
         return this._lastOutput;
     }
     
+    public void setStatus(final Map<Object, String> status) {
+        this._status = status;
+    }
+    
     private volatile long _lastOutputTime = 0;
     private volatile String _lastOutput;
     
@@ -150,6 +158,8 @@ public class FFRelay {
 	private final String _dest;
 	private final ExecutorService _runner = 
 	        Executors.newSingleThreadExecutor();
+	
+	private Map<Object, String> _status;
 	
 	private volatile boolean _running = false; 
 	private volatile Process _currentProcess = null;

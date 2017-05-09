@@ -4,21 +4,17 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-    <bean id="relay" class="org.jocean.ffrelay.FFRelay"
-        init-method="start"
-        destroy-method="stop">
-        <constructor-arg ref="ffmpeg"/>
-        <constructor-arg name="name" value="${name}"/>
-        <constructor-arg name="source" value="${from}"/>
-        <constructor-arg name="dest" value="${to}"/>
-        <property name="status" ref="status"/>
+    <bean id="status" class="java.util.concurrent.ConcurrentHashMap"/>
+
+    <bean id="relayStatus" class="org.jocean.ffrelay.RelayStatus">
+        <constructor-arg name="status" ref="status"/>
     </bean>
     
     <bean class="org.springframework.jmx.export.MBeanExporter"
           lazy-init="false">
         <property name="beans">
             <map>
-                <entry key="ffrelay:name=${name}"    value-ref="relay"/>
+                <entry key="ffrelay:type=status" value-ref="relayStatus"/>
             </map>
         </property>
     </bean>
