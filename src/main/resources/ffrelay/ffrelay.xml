@@ -14,7 +14,7 @@
           lazy-init="false">
         <property name="beans">
             <map>
-                <entry key="ffrelay:type=1_status" value-ref="relayStatus"/>
+                <entry key="ffrelay:name=allStatus" value-ref="relayStatus"/>
             </map>
         </property>
     </bean>
