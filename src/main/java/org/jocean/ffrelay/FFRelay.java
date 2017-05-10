@@ -3,6 +3,7 @@ package org.jocean.ffrelay;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.jocean.idiom.ExceptionUtils;
 import org.joda.time.Period;
@@ -53,6 +54,7 @@ public class FFRelay {
 	        return;
 	    }
 	    
+	    this._beginTimestamp = System.currentTimeMillis();
 	    this._running = true;
 	    this._runner.submit(new Runnable() {
             @Override
@@ -78,6 +80,9 @@ public class FFRelay {
                 final FFmpegJob job = executor.createJob(builder, new ProgressListener() {
                     @Override
                     public void progress(final Progress progress) {
+                        final long ts = System.currentTimeMillis();
+                        _currentBeginTimestamp.compareAndSet(0, ts);
+                        _currentWorkMs = ts - _currentBeginTimestamp.get();
                     }
                 });
                 
@@ -113,6 +118,10 @@ public class FFRelay {
                 if (this._running) {
                     OUT.info("restart relaying...");
                 }
+            } finally {
+                _totalWorkMs += _currentWorkMs;
+                _currentWorkMs = 0;
+                _currentBeginTimestamp.set(0);
             }
         }
     }
@@ -136,6 +145,15 @@ public class FFRelay {
         return this._name;
     }
     
+    public String getNonworkDuration() {
+        final Period period = new Period(System.currentTimeMillis() - this._beginTimestamp - 
+                (_totalWorkMs + _currentWorkMs));
+        return PERIODFMT.print(period.normalizedStandard()) + " nonwork";
+//        return Long.toString(System.currentTimeMillis() - this._beginTimestamp) + "/"
+//            + Long.toString(_totalWorkMs + _currentWorkMs);
+        
+    }
+    
     public String getLastOutputTime() {
         final Period period = new Period(System.currentTimeMillis() - _lastOutputTime);
         return PERIODFMT.print(period.normalizedStandard()) + " before";
@@ -149,6 +167,10 @@ public class FFRelay {
         this._status = status;
     }
     
+    private long _beginTimestamp;
+    private volatile long _totalWorkMs = 0;
+    private final AtomicLong _currentBeginTimestamp = new AtomicLong(0);
+    private volatile long _currentWorkMs = 0;
     private volatile long _lastOutputTime = 0;
     private volatile String _lastOutput;
     
