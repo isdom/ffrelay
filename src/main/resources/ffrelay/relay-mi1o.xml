@@ -12,6 +12,7 @@
         <constructor-arg name="sources" value="${from}"/>
         <constructor-arg name="dest" value="${to}"/>
         <property name="status" ref="status"/>
+        <property name="interval" ref="${interval:30}"/>
     </bean>
     
     <bean class="org.springframework.jmx.export.MBeanExporter"

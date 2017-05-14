@@ -97,7 +97,7 @@ public class FFRelayMI1O {
                             @Override
                             public void run() {
                                 p.destroyForcibly();
-                            }}, 1000 * 30);
+                            }}, 1000 * _switchInterval);
                     }
 
                     @Override
@@ -180,10 +180,15 @@ public class FFRelayMI1O {
         return this._lastOutput;
     }
     
+    public void setInterval(final long interval) {
+        this._switchInterval = interval;
+    }
+    
     public void setStatus(final Map<Object, String> status) {
         this._status = status;
     }
     
+    private volatile long _switchInterval = 30;
     private long _beginTimestamp;
     private volatile long _totalWorkMs = 0;
     private final AtomicLong _currentBeginTimestamp = new AtomicLong(0);
