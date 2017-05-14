@@ -53,6 +53,21 @@
         </encoder>
     </appender>
 
+    <appender name="room0" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${user.dir}/logs/room0.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <FileNamePattern>${user.dir}/logs/bak/room0.%d{yyyy-MM-dd}.%i.log.gz</FileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy
+                class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>1024MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %5p |-%c{35}:%L - %m %n</pattern>
+        </encoder>
+    </appender>
+    
     <appender name="room1" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${user.dir}/logs/room1.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
@@ -173,6 +188,36 @@
         </encoder>
     </appender>
     
+    <appender name="room9" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${user.dir}/logs/room9.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <FileNamePattern>${user.dir}/logs/bak/room9.%d{yyyy-MM-dd}.%i.log.gz</FileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy
+                class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>1024MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %5p |-%c{35}:%L - %m %n</pattern>
+        </encoder>
+    </appender>
+    
+    <appender name="room10" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${user.dir}/logs/room10.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <FileNamePattern>${user.dir}/logs/bak/room10.%d{yyyy-MM-dd}.%i.log.gz</FileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy
+                class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>1024MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %5p |-%c{35}:%L - %m %n</pattern>
+        </encoder>
+    </appender>
+    
     <logger name="org.jocean.http.util" level="DEBUG"/>
     <logger name="org.apache.zookeeper" level="WARN"/>
     <logger name="org.jocean.ffrelay" level="DEBUG"/>
@@ -182,6 +227,10 @@
         <appender-ref ref="timeoutLogger"/>
     </logger>
 
+    <logger name="room0" level="INFO" additivity="false">
+        <appender-ref ref="room0"/>
+    </logger>
+    
     <logger name="room1" level="INFO" additivity="false">
         <appender-ref ref="room1"/>
     </logger>
@@ -212,6 +261,14 @@
     
     <logger name="room8" level="INFO" additivity="false">
         <appender-ref ref="room8"/>
+    </logger>
+    
+    <logger name="room9" level="INFO" additivity="false">
+        <appender-ref ref="room9"/>
+    </logger>
+    
+    <logger name="room10" level="INFO" additivity="false">
+        <appender-ref ref="room10"/>
     </logger>
     
     <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
