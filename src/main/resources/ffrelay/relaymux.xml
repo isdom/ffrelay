@@ -4,7 +4,7 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-    <bean id="relay" class="org.jocean.ffrelay.FFRelayMI1O"
+    <bean id="relay" class="org.jocean.ffrelay.FFRelayMux"
         init-method="start"
         destroy-method="stop">
         <constructor-arg ref="ffmpeg"/>
@@ -19,7 +19,7 @@
           lazy-init="false">
         <property name="beans">
             <map>
-                <entry key="ffrelay:name=${name}"    value-ref="relay"/>
+                <entry key="ffrelay:name=${name}" value-ref="relay"/>
             </map>
         </property>
     </bean>

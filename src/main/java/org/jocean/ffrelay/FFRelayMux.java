@@ -7,6 +7,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.jocean.idiom.BeanHolder;
+import org.jocean.idiom.BeanHolderAware;
 import org.jocean.idiom.ExceptionUtils;
 import org.joda.time.Period;
 import org.joda.time.format.PeriodFormatter;
@@ -23,7 +25,10 @@ import net.bramp.ffmpeg.job.FFmpegJob;
 import net.bramp.ffmpeg.progress.Progress;
 import net.bramp.ffmpeg.progress.ProgressListener;
 
-public class FFRelayMI1O {
+public class FFRelayMux implements BeanHolderAware {
+    private final static Logger LOG = 
+            LoggerFactory.getLogger(FFRelayMux.class);
+    
     private final Logger OUT;
     private static final PeriodFormatter PERIODFMT = new PeriodFormatterBuilder()
             .appendYears()
@@ -42,7 +47,7 @@ public class FFRelayMI1O {
             .appendSuffix(" s")
             .toFormatter();
 
-	public FFRelayMI1O(final FFmpeg ffmpeg, final String name, final String sources, final String dest) {
+	public FFRelayMux(final FFmpeg ffmpeg, final String name, final String sources, final String dest) {
 	    this._ffmpeg = ffmpeg;
 	    this._name = name;
 	    this._sources = sources.split(",");
@@ -67,11 +72,23 @@ public class FFRelayMI1O {
 	
 	private void doRelay() {
         while (this._running) {
-            OUT.info("relay from {} --> to {}", this._sources[this._currentSrcIdx], this._dest);
+            final String relayname = this._sources[this._currentSrcIdx];
+            final FFRelay relay = this._beanHolder.getBean("relay" + relayname, FFRelay.class);
+            if (null == relay) {
+                OUT.warn("can not found relay named {}, and try next", relayname);
+                stepSrcIdx();
+                continue;
+            }
+            if (!relay.isValid()) {
+                OUT.warn("relay named {} not valid, and try next", relayname);
+                stepSrcIdx();
+                continue;
+            }
+            OUT.info("relay from {} --> to {}", relay.getDestPullUri(), this._dest);
             try {
                 final FFmpegBuilder builder =  new FFmpegBuilder()
                     .setVerbosity(Verbosity.INFO)
-                    .setInput(this._sources[this._currentSrcIdx])
+                    .setInput(relay.getDestPullUri())
                     .addOutput(this._dest)
                         .setFormat("flv")
                         .setAudioCodec("copy")
@@ -129,16 +146,20 @@ public class FFRelayMI1O {
                 _totalWorkMs += _currentWorkMs;
                 _currentWorkMs = 0;
                 _currentBeginTimestamp.set(0);
-                this._currentSrcIdx++;
-                if (this._currentSrcIdx >= this._sources.length) {
-                    this._currentSrcIdx = 0;
-                }
+                stepSrcIdx();
                 try {
                     // wait for 3s
                     Thread.sleep(1000 * 3);
                 } catch (InterruptedException e) {
                 }
             }
+        }
+    }
+
+    private void stepSrcIdx() {
+        this._currentSrcIdx++;
+        if (this._currentSrcIdx >= this._sources.length) {
+            this._currentSrcIdx = 0;
         }
     }
 
@@ -188,6 +209,12 @@ public class FFRelayMI1O {
         this._status = status;
     }
     
+    @Override
+    public void setBeanHolder(final BeanHolder beanHolder) {
+        this._beanHolder = beanHolder;
+    }
+    
+    private BeanHolder _beanHolder;
     private volatile long _switchInterval = 30;
     private long _beginTimestamp;
     private volatile long _totalWorkMs = 0;

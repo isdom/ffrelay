@@ -6,19 +6,21 @@
 
     <bean id="relay" class="org.jocean.ffrelay.FFRelay"
         init-method="start"
-        destroy-method="stop">
+        destroy-method="stop"
+        name="relay${name}">
         <constructor-arg ref="ffmpeg"/>
         <constructor-arg name="name" value="${name}"/>
         <constructor-arg name="source" value="${from}"/>
         <constructor-arg name="dest" value="${to}"/>
         <property name="status" ref="status"/>
+        <property name="destPullUri" value="${dest.pulluri}"/>
     </bean>
     
     <bean class="org.springframework.jmx.export.MBeanExporter"
           lazy-init="false">
         <property name="beans">
             <map>
-                <entry key="ffrelay:name=${name}"    value-ref="relay"/>
+                <entry key="ffrelay:name=${name}"    value-ref="relay${name}"/>
             </map>
         </property>
     </bean>

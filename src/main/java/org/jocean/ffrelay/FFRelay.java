@@ -83,6 +83,7 @@ public class FFRelay {
                         final long ts = System.currentTimeMillis();
                         _currentBeginTimestamp.compareAndSet(0, ts);
                         _currentWorkMs = ts - _currentBeginTimestamp.get();
+                        _valid = true;
                     }
                 });
                 
@@ -119,6 +120,7 @@ public class FFRelay {
                     OUT.info("restart relaying...");
                 }
             } finally {
+                _valid = false;
                 _totalWorkMs += _currentWorkMs;
                 _currentWorkMs = 0;
                 _currentBeginTimestamp.set(0);
@@ -149,9 +151,6 @@ public class FFRelay {
         final Period period = new Period(System.currentTimeMillis() - this._beginTimestamp - 
                 (_totalWorkMs + _currentWorkMs));
         return PERIODFMT.print(period.normalizedStandard()) + " nonwork";
-//        return Long.toString(System.currentTimeMillis() - this._beginTimestamp) + "/"
-//            + Long.toString(_totalWorkMs + _currentWorkMs);
-        
     }
     
     public String getLastOutputTime() {
@@ -167,6 +166,19 @@ public class FFRelay {
         this._status = status;
     }
     
+    public void setDestPullUri(final String uri) {
+        this._destPullUri = uri;
+    }
+    
+    public String getDestPullUri() {
+        return this._destPullUri;
+    }
+    
+    public boolean isValid() {
+        return this._valid;
+    }
+
+    private volatile boolean _valid = false;
     private long _beginTimestamp;
     private volatile long _totalWorkMs = 0;
     private final AtomicLong _currentBeginTimestamp = new AtomicLong(0);
@@ -178,6 +190,7 @@ public class FFRelay {
 	private final FFmpeg _ffmpeg;
 	private final String _source;
 	private final String _dest;
+	private String _destPullUri;
 	private final ExecutorService _runner = 
 	        Executors.newSingleThreadExecutor();
 	
