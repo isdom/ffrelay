@@ -32,6 +32,7 @@ dependencies {
     compile 'org.jocean:jocean-idiom:0.1.4-SNAPSHOT'
     compile 'org.jocean:jocean-j2se:0.0.4-SNAPSHOT'
     compile 'org.jocean:jocean-jdmk:0.0.2'
+    compile 'org.jocean:jocean-http:0.0.2-SNAPSHOT'
     
     // The production code uses the SLF4J logging API at compile time
     compile 'org.slf4j:slf4j-api:1.7.25'

@@ -1,16 +1,17 @@
 package org.jocean.ffrelay;
 
+import java.net.URI;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
+import javax.net.ssl.SSLException;
 
-import org.jocean.idiom.BeanHolder;
-import org.jocean.idiom.BeanHolderAware;
+import org.jocean.http.Feature;
+import org.jocean.http.rosa.SignalClient;
 import org.jocean.idiom.ExceptionUtils;
 import org.joda.time.Period;
 import org.joda.time.format.PeriodFormatter;
@@ -18,6 +19,9 @@ import org.joda.time.format.PeriodFormatterBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import net.bramp.ffmpeg.FFmpeg;
 import net.bramp.ffmpeg.FFmpegExecutor;
 import net.bramp.ffmpeg.ProcessMonitor;
@@ -27,9 +31,17 @@ import net.bramp.ffmpeg.job.FFmpegJob;
 import net.bramp.ffmpeg.progress.Progress;
 import net.bramp.ffmpeg.progress.ProgressListener;
 
-public class FFRelayMux implements BeanHolderAware {
-    private final static Logger LOG = 
-            LoggerFactory.getLogger(FFRelayMux.class);
+public class FFRelaySD implements Relay {
+    private static SslContext initSSLCtx() {
+        try {
+            return SslContextBuilder.forClient()
+                .trustManager(InsecureTrustManagerFactory.INSTANCE).build();
+        } catch (SSLException e) {
+            return null;
+        }
+    }
+
+    private static final SslContext SSLCTX = initSSLCtx();
     
     private final Logger OUT;
     private static final PeriodFormatter PERIODFMT = new PeriodFormatterBuilder()
@@ -49,9 +61,9 @@ public class FFRelayMux implements BeanHolderAware {
             .appendSuffix(" s")
             .toFormatter();
 
-	public FFRelayMux(final String name, final String sources, final String dest) {
+	public FFRelaySD(final String name, final String sn, final String dest) {
 	    this._name = name;
-	    this._sources = sources.split(",");
+	    this._sn = sn;
 	    this._dest = dest;
 	    this.OUT = LoggerFactory.getLogger(name);
     }
@@ -73,23 +85,36 @@ public class FFRelayMux implements BeanHolderAware {
 	
 	private void doRelay() {
         while (this._running) {
-            final String relayname = this._sources[this._currentSrcIdx];
-            final Relay relay = this._beanHolder.getBean("relay" + relayname, Relay.class);
-            if (null == relay) {
-                OUT.warn("can not found relay named {}, and try next", relayname);
-                stepSrcIdx();
-                continue;
-            }
-            if (!relay.isValid()) {
-                OUT.warn("relay named {} not valid, and try next", relayname);
-                stepSrcIdx();
-                continue;
-            }
-            OUT.info("relay from {} --> to {}", relay.getDestPullUri(), this._dest);
             try {
+                OUT.info("get info & play for sn:{}", this._sn);
+                final GetInfoAndPlayV2.Resp resp = this._client.interaction()
+                    .feature(new Feature.ENABLE_SSL(SSLCTX))
+                    .feature(new SignalClient.UsingUri(_apiUri))
+                    .feature(new SignalClient.UsingPath(_apiPath))
+                    .feature(new SignalClient.DecodeResponseBodyAs(GetInfoAndPlayV2.Resp.class))
+                    .request(new GetInfoAndPlayV2.Req(this._sn))
+                    .<GetInfoAndPlayV2.Resp>build()
+                    .timeout(10, TimeUnit.SECONDS)
+                    .toBlocking()
+                    .single();
+                if ( 0 != resp.getErrorCode() 
+                   || null == resp.getPlayInfo()
+                   || null == resp.getPlayInfo().getRtmp()) {
+                    OUT.warn("get info & play for sn({}) failed, resp: {}", this._sn, resp);
+                    try {
+                        // wait for 1s
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                    }
+                    OUT.info("re-try get info & play...");
+                    continue;
+                }
+                OUT.info("get info & play for sn({}) success, resp: {}", this._sn, resp);
+                final String rtmp = resp.getPlayInfo().getRtmp();
+                OUT.info("relay from {} --> to {}", rtmp, this._dest);
                 final FFmpegBuilder builder =  new FFmpegBuilder()
                     .setVerbosity(Verbosity.INFO)
-                    .setInput(relay.getDestPullUri())
+                    .setInput(rtmp)
                     .addOutput(this._dest)
                         .setFormat("flv")
                         .setAudioCodec("copy")
@@ -103,6 +128,7 @@ public class FFRelayMux implements BeanHolderAware {
                         final long ts = System.currentTimeMillis();
                         _currentBeginTimestamp.compareAndSet(0, ts);
                         _currentWorkMs = ts - _currentBeginTimestamp.get();
+                        _valid = true;
                     }
                 });
                 
@@ -111,11 +137,6 @@ public class FFRelayMux implements BeanHolderAware {
                     public void setProcess(final Process p) {
                         _currentProcess = p;
                         OUT.info("current process has been set: {}", _currentProcess);
-                        _timer.schedule(new TimerTask() {
-                            @Override
-                            public void run() {
-                                p.destroyForcibly();
-                            }}, 1000 * _switchInterval);
                     }
 
                     @Override
@@ -144,23 +165,11 @@ public class FFRelayMux implements BeanHolderAware {
                     OUT.info("restart relaying...");
                 }
             } finally {
+                _valid = false;
                 _totalWorkMs += _currentWorkMs;
                 _currentWorkMs = 0;
                 _currentBeginTimestamp.set(0);
-                stepSrcIdx();
-                try {
-                    // wait for 3s
-                    Thread.sleep(1000 * 3);
-                } catch (InterruptedException e) {
-                }
             }
-        }
-    }
-
-    private void stepSrcIdx() {
-        this._currentSrcIdx++;
-        if (this._currentSrcIdx >= this._sources.length) {
-            this._currentSrcIdx = 0;
         }
     }
 
@@ -174,7 +183,6 @@ public class FFRelayMux implements BeanHolderAware {
 	            OUT.warn("current process is null");
 	        }
 	        this._runner.shutdownNow();
-	        this._timer.cancel();
 	    } else {
             OUT.warn("FFRelay not running.");
 	    }
@@ -188,9 +196,6 @@ public class FFRelayMux implements BeanHolderAware {
         final Period period = new Period(System.currentTimeMillis() - this._beginTimestamp - 
                 (_totalWorkMs + _currentWorkMs));
         return PERIODFMT.print(period.normalizedStandard()) + " nonwork";
-//        return Long.toString(System.currentTimeMillis() - this._beginTimestamp) + "/"
-//            + Long.toString(_totalWorkMs + _currentWorkMs);
-        
     }
     
     public String getLastOutputTime() {
@@ -202,24 +207,40 @@ public class FFRelayMux implements BeanHolderAware {
         return this._lastOutput;
     }
     
-    public void setInterval(final long interval) {
-        this._switchInterval = interval;
-    }
-    
     public void setStatus(final Map<Object, String> status) {
         this._status = status;
     }
     
+    public void setDestPullUri(final String uri) {
+        this._destPullUri = uri;
+    }
+    
     @Override
-    public void setBeanHolder(final BeanHolder beanHolder) {
-        this._beanHolder = beanHolder;
+    public String getDestPullUri() {
+        return this._destPullUri;
+    }
+    
+    @Override
+    public boolean isValid() {
+        return this._valid;
+    }
+    
+    public void setApiPath(final String path) {
+        this._apiPath = path;
     }
     
     @Inject
     private FFmpeg _ffmpeg;
     
-    private BeanHolder _beanHolder;
-    private volatile long _switchInterval = 30;
+    @Inject
+    private SignalClient _client;
+    
+    @Inject
+    private URI _apiUri;
+    
+    private String _apiPath;
+    
+    private volatile boolean _valid = false;
     private long _beginTimestamp;
     private volatile long _totalWorkMs = 0;
     private final AtomicLong _currentBeginTimestamp = new AtomicLong(0);
@@ -228,12 +249,11 @@ public class FFRelayMux implements BeanHolderAware {
     private volatile String _lastOutput;
     
     private final String _name;
-	private final String[] _sources;
+	private final String _sn;
 	private final String _dest;
-	private int _currentSrcIdx = 0;
+	private String _destPullUri;
 	private final ExecutorService _runner = 
 	        Executors.newSingleThreadExecutor();
-	private final Timer _timer = new Timer();
 	
 	private Map<Object, String> _status;
 	

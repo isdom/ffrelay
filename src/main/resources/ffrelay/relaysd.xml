@@ -4,15 +4,16 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-    <bean id="relay" class="org.jocean.ffrelay.FFRelay"
+    <bean id="relay" class="org.jocean.ffrelay.FFRelaySD"
         init-method="start"
         destroy-method="stop"
         name="relay${name}">
         <constructor-arg name="name" value="${name}"/>
-        <constructor-arg name="source" value="${from}"/>
+        <constructor-arg name="sn" value="${sn}"/>
         <constructor-arg name="dest" value="${to}"/>
         <property name="status" ref="status"/>
         <property name="destPullUri" value="${dest.pulluri}"/>
+        <property name="apiPath" ref="apiPath"/>
     </bean>
     
     <bean class="org.springframework.jmx.export.MBeanExporter"

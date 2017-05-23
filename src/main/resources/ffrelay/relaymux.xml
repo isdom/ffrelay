@@ -7,7 +7,6 @@
     <bean id="relay" class="org.jocean.ffrelay.FFRelayMux"
         init-method="start"
         destroy-method="stop">
-        <constructor-arg ref="ffmpeg"/>
         <constructor-arg name="name" value="${name}"/>
         <constructor-arg name="sources" value="${from}"/>
         <constructor-arg name="dest" value="${to}"/>

@@ -5,6 +5,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.inject.Inject;
+
 import org.jocean.idiom.ExceptionUtils;
 import org.joda.time.Period;
 import org.joda.time.format.PeriodFormatter;
@@ -21,7 +23,7 @@ import net.bramp.ffmpeg.job.FFmpegJob;
 import net.bramp.ffmpeg.progress.Progress;
 import net.bramp.ffmpeg.progress.ProgressListener;
 
-public class FFRelay {
+public class FFRelay implements Relay {
     private final Logger OUT;
     private static final PeriodFormatter PERIODFMT = new PeriodFormatterBuilder()
             .appendYears()
@@ -40,8 +42,7 @@ public class FFRelay {
             .appendSuffix(" s")
             .toFormatter();
 
-	public FFRelay(final FFmpeg ffmpeg, final String name, final String source, final String dest) {
-	    this._ffmpeg = ffmpeg;
+	public FFRelay(final String name, final String source, final String dest) {
 	    this._name = name;
 	    this._source = source;
 	    this._dest = dest;
@@ -170,14 +171,19 @@ public class FFRelay {
         this._destPullUri = uri;
     }
     
+    @Override
     public String getDestPullUri() {
         return this._destPullUri;
     }
     
+    @Override
     public boolean isValid() {
         return this._valid;
     }
 
+    @Inject
+    private FFmpeg _ffmpeg;
+    
     private volatile boolean _valid = false;
     private long _beginTimestamp;
     private volatile long _totalWorkMs = 0;
@@ -187,7 +193,7 @@ public class FFRelay {
     private volatile String _lastOutput;
     
     private final String _name;
-	private final FFmpeg _ffmpeg;
+    
 	private final String _source;
 	private final String _dest;
 	private String _destPullUri;

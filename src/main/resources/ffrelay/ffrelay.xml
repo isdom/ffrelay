@@ -10,6 +10,14 @@
         <constructor-arg name="status" ref="status"/>
     </bean>
     
+    <bean class="java.net.URI">
+        <constructor-arg value="${api.uri}"/>
+    </bean>
+    
+    <bean id="apiPath" class="java.lang.String">
+        <constructor-arg value="${api.path}"/>
+    </bean>
+    
     <bean class="org.springframework.jmx.export.MBeanExporter"
           lazy-init="false">
         <property name="beans">

@@ -4,7 +4,7 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
         
-    <bean id="ffmpeg" class="net.bramp.ffmpeg.FFmpeg">
+    <bean class="net.bramp.ffmpeg.FFmpeg">
         <constructor-arg value="${ffmpeg.path}"/>
     </bean>
      
