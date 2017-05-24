@@ -12,7 +12,7 @@
         <constructor-arg name="sn" value="${sn}"/>
         <constructor-arg name="dest" value="${to}"/>
         <property name="status" ref="status"/>
-        <property name="status" ref="infos"/>
+        <property name="infos" ref="infos"/>
         <property name="destPullUri" value="${dest.pulluri}"/>
         <property name="apiPath" ref="apiPath"/>
     </bean>
