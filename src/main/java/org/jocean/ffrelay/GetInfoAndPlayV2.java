@@ -68,9 +68,24 @@ public class GetInfoAndPlayV2 {
         public static class PlayInfo {
             @Override
             public String toString() {
-                return "PlayInfo [rtmp=" + _rtmp + ", hls=" + _hls + "]";
+                final StringBuilder builder = new StringBuilder();
+                builder.append("PlayInfo [imageUrl=").append(_imageUrl)
+                    .append(", rtmp=").append(_rtmp)
+                    .append(", hls=").append(_hls)
+                    .append("]");
+                return builder.toString();
             }
 
+            @JSONField(name="imageUrl")
+            public String getImageUrl() {
+                return _imageUrl;
+            }
+
+            @JSONField(name="imageUrl")
+            public void setImageUrl(String url) {
+                this._imageUrl = url;
+            }
+            
             @JSONField(name="rtmp")
             public String getRtmp() {
                 return _rtmp;
@@ -91,6 +106,7 @@ public class GetInfoAndPlayV2 {
                 this._hls = hls;
             }
 
+            private String _imageUrl;
             private String _rtmp;
             private String _hls;
         }

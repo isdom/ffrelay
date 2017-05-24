@@ -35,7 +35,8 @@ public class FFRelaySD implements Relay {
     private static SslContext initSSLCtx() {
         try {
             return SslContextBuilder.forClient()
-                .trustManager(InsecureTrustManagerFactory.INSTANCE).build();
+                .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                .build();
         } catch (SSLException e) {
             return null;
         }
@@ -110,6 +111,11 @@ public class FFRelaySD implements Relay {
                     continue;
                 }
                 OUT.info("get info & play for sn({}) success, resp: {}", this._sn, resp);
+                // update all info of sn
+                this._infos.put(this._sn + "-imageUrl", resp.getPlayInfo().getImageUrl());
+                this._infos.put(this._sn + "-rtmp", resp.getPlayInfo().getRtmp());
+                this._infos.put(this._sn + "-hls", resp.getPlayInfo().getHls());
+                
                 final String rtmp = resp.getPlayInfo().getRtmp();
                 OUT.info("relay from {} --> to {}", rtmp, this._dest);
                 final FFmpegBuilder builder =  new FFmpegBuilder()
@@ -188,6 +194,10 @@ public class FFRelaySD implements Relay {
 	    }
 	}
 
+    public String getSN() {
+        return this._sn;
+    }
+    
     public String getName() {
         return this._name;
     }
@@ -205,6 +215,10 @@ public class FFRelaySD implements Relay {
     
     public String getLastOutput() {
         return this._lastOutput;
+    }
+    
+    public void setInfos(final Map<String, String> infos) {
+        this._infos = infos;
     }
     
     public void setStatus(final Map<Object, String> status) {
@@ -254,8 +268,9 @@ public class FFRelaySD implements Relay {
 	private String _destPullUri;
 	private final ExecutorService _runner = 
 	        Executors.newSingleThreadExecutor();
-	
+
 	private Map<Object, String> _status;
+    private Map<String, String> _infos;
 	
 	private volatile boolean _running = false; 
 	private volatile Process _currentProcess = null;

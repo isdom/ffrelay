@@ -5,9 +5,11 @@
         http://www.springframework.org/schema/beans/spring-beans.xsd">
 
     <bean id="status" class="java.util.concurrent.ConcurrentHashMap"/>
+    <bean id="infos" class="java.util.concurrent.ConcurrentHashMap"/>
 
     <bean id="relayStatus" class="org.jocean.ffrelay.RelayStatus">
         <constructor-arg name="status" ref="status"/>
+        <constructor-arg name="infos" ref="infos"/>
     </bean>
     
     <bean class="java.net.URI">
