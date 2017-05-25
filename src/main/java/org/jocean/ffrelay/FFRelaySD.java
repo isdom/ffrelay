@@ -2,8 +2,9 @@ package org.jocean.ffrelay;
 
 import java.net.URI;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -77,15 +78,24 @@ public class FFRelaySD implements Relay {
 	    
 	    this._beginTimestamp = System.currentTimeMillis();
 	    this._running = true;
-	    this._runner.submit(new Runnable() {
+	    scheduleNextRelay(0, null);
+	}
+
+    private Future<?> scheduleNextRelay(final long delay, final String infomsg) {
+        return this._runner.schedule(new Runnable() {
             @Override
             public void run() {
+                if (null != infomsg) {
+                    OUT.info(infomsg);
+                }
                 doRelay();
-            }});
-	}
+            }},
+            delay, 
+            TimeUnit.SECONDS);
+    }
 	
 	private void doRelay() {
-        while (this._running) {
+        if (this._running) {
             try {
                 OUT.info("get info & play for sn:{}", this._sn);
                 final GetInfoAndPlayV2.Resp resp = this._client.interaction()
@@ -102,13 +112,7 @@ public class FFRelaySD implements Relay {
                    || null == resp.getPlayInfo()
                    || null == resp.getPlayInfo().getRtmp()) {
                     OUT.warn("get info & play for sn({}) failed, resp: {}", this._sn, resp);
-                    try {
-                        // wait for 1s
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                    }
-                    OUT.info("re-try get info & play...");
-                    continue;
+                    return;
                 }
                 OUT.info("get info & play for sn({}) success, resp: {}", this._sn, resp);
                 // update all info of sn
@@ -175,15 +179,16 @@ public class FFRelaySD implements Relay {
                 _totalWorkMs += _currentWorkMs;
                 _currentWorkMs = 0;
                 _currentBeginTimestamp.set(0);
+                scheduleNextRelay(1, "re-try get info & play...");
             }
         }
     }
 
     public synchronized void stop() {
 	    if (this._running) {
+            this._running = false;
 	        final Process p = this._currentProcess;
 	        if (null != p) {
-	            this._running = false;
 	            p.destroyForcibly();
 	        } else {
 	            OUT.warn("current process is null");
@@ -266,8 +271,8 @@ public class FFRelaySD implements Relay {
 	private final String _sn;
 	private final String _dest;
 	private String _destPullUri;
-	private final ExecutorService _runner = 
-	        Executors.newSingleThreadExecutor();
+	private final ScheduledExecutorService _runner = 
+	        Executors.newSingleThreadScheduledExecutor();
 
 	private Map<Object, String> _status;
     private Map<String, String> _infos;
