@@ -39,18 +39,33 @@ public class QueryLiveInfoBiz extends AbstractFlow<QueryLiveInfoBiz> implements
     }
 
     private BizStep onHttpAccept() throws Exception {
-        if ( null != this._request.getSN()) {
-            responseSections(
-                    this._infos.get(sn2imgurlkey(this._request.getSN())), 
-                    this._infos.get(sn2rtmpkey(this._request.getSN())), 
-                    this._infos.get(sn2hlskey(this._request.getSN()))
-                    );
-        } else {
-            responseSections(null, null, null);
+        // no sn param
+        if ( null == this._request.getSN()) {
+            responseSections(-1);
+            return null;
         }
+        final String errorCode = this._infos.get(sn2errorCode(this._request.getSN()));
+        if (null == errorCode) {
+            responseSections(-1);
+            return null;
+        }
+        final int code = Integer.parseInt(errorCode);
+        if (0 != code) {
+            responseSections(code);
+            return null;
+        }
+        responseSections(
+                this._infos.get(sn2imgurlkey(this._request.getSN())), 
+                this._infos.get(sn2rtmpkey(this._request.getSN())), 
+                this._infos.get(sn2hlskey(this._request.getSN()))
+                );
         return null;
     }
 
+    private String sn2errorCode(final String sn) {
+        return sn + "-errorCode" ;
+    }
+    
     private String sn2imgurlkey(final String sn) {
         return sn + "-imageUrl" ;
     }
@@ -63,12 +78,20 @@ public class QueryLiveInfoBiz extends AbstractFlow<QueryLiveInfoBiz> implements
         return sn + "-hls" ;
     }
     
+    private void responseSections(final int errorCode) {
+        final QueryLiveInfoResponse resp = new QueryLiveInfoResponse();
+        resp.setErrorCode(errorCode);
+        
+        resp.setAccessControlAllowOrigin(_acrOrigin);
+        _outputReactor.output(resp);
+    }
+    
     private void responseSections(
             final String url,
             final String rtmp,
             final String hls) {
         final QueryLiveInfoResponse resp = new QueryLiveInfoResponse();
-        final int errorCode = (null != url && null != rtmp && null != hls) ? 0 : 1000;
+        final int errorCode = (null != url && null != rtmp && null != hls) ? 0 : -1;
         resp.setErrorCode(errorCode);
         resp.setImageUrl(url);
         resp.setRtmp(rtmp);

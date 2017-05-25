@@ -4,7 +4,7 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-    <bean id="relay" class="org.jocean.ffrelay.FFRelaySD"
+    <bean id="relay" class="org.jocean.ffrelay.shuidi.FFRelaySD"
         init-method="start"
         destroy-method="stop"
         name="relay${name}">

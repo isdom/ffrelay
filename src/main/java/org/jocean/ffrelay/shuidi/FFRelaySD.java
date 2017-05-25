@@ -1,4 +1,4 @@
-package org.jocean.ffrelay;
+package org.jocean.ffrelay.shuidi;
 
 import java.net.URI;
 import java.util.Map;
@@ -11,6 +11,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.inject.Inject;
 import javax.net.ssl.SSLException;
 
+import org.jocean.ffrelay.Relay;
+import org.jocean.ffrelay.shuidi.spi.GetInfoAndPlayV2;
 import org.jocean.http.Feature;
 import org.jocean.http.rosa.SignalClient;
 import org.jocean.idiom.ExceptionUtils;
@@ -108,6 +110,7 @@ public class FFRelaySD implements Relay {
                     .timeout(10, TimeUnit.SECONDS)
                     .toBlocking()
                     .single();
+                this._infos.put(this._sn + "-errorCode", Integer.toString(resp.getErrorCode()));
                 if ( 0 != resp.getErrorCode() 
                    || null == resp.getPlayInfo()
                    || null == resp.getPlayInfo().getRtmp()) {

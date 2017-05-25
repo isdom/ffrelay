@@ -1,4 +1,4 @@
-package org.jocean.ffrelay;
+package org.jocean.ffrelay.shuidi.spi;
 
 import java.net.URI;
 import java.net.URISyntaxException;
