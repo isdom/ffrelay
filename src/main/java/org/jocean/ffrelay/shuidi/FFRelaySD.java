@@ -93,7 +93,7 @@ public class FFRelaySD implements Relay {
                 doRelay();
             }},
             delay, 
-            TimeUnit.SECONDS);
+            TimeUnit.MILLISECONDS);
     }
 	
 	private synchronized void doRelay() {
@@ -112,7 +112,7 @@ public class FFRelaySD implements Relay {
                     startRelay();
                 }
             } finally {
-                scheduleNextRelay(1, null);
+                scheduleNextRelay(1000, null);
             }
         }
     }
@@ -197,6 +197,7 @@ public class FFRelaySD implements Relay {
     private void onRelayEnded() {
         this._relayProcess = null;
         this._checkRelay = null;
+        this._rtmpurl = null;
         this._valid = false;
         this._totalWorkMs += _currentWorkMs;
         this._currentWorkMs = 0;

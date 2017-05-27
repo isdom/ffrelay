@@ -173,23 +173,23 @@ abstract class FFcommon {
         @Override
         public Boolean call() {
             try {
-                if (in.ready()) {
+                while (in.ready()) {
                     final int readcnt = in.read(cbuf);
                     if (readcnt > 0) {
                         lineBuf.add(cbuf, 0, readcnt);
-                        // true means process NOT ended
-                        return false;
                     }
-//                    if (-1 == readcnt) {
-                    lineBuf.finish();
-                    if (null!=progressParser) {
-                        progressParser.close();
+                    if (-1 == readcnt) {
+                        lineBuf.finish();
+                        if (null!=progressParser) {
+                            progressParser.close();
+                        }
+                        throwOnError(p);
+                        // true means process ended
+                        return true;
                     }
-                    throwOnError(p);
-                    // true means process ended
-                    return true;
-//                    }
                 }
+                // false means process NOT ended
+                return false;
             } catch (Exception e) {
                 try {
                     lineBuf.finish();
@@ -204,8 +204,6 @@ abstract class FFcommon {
                 p.destroy();
                 throw new RuntimeException(e);
             }
-            // true means process ended
-            return true;
         }
     };
 }
