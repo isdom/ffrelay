@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -185,9 +186,9 @@ public class FFmpeg extends FFcommon {
   }
 
   @Override
-  public void run(List<String> args, final ProcessMonitor monitor) throws IOException {
+  public Callable<Boolean> run(List<String> args, final ProcessMonitor monitor, final ProgressParser progressParser) throws IOException {
     checkIfFFmpeg();
-    super.run(args, monitor);
+    return super.run(args, monitor, progressParser);
   }
   
   public void run(FFmpegBuilder builder) throws IOException {
@@ -209,20 +210,19 @@ public class FFmpeg extends FFcommon {
     }
   }
 
-  public void run(FFmpegBuilder builder, 
+  public Callable<Boolean> run(FFmpegBuilder builder, 
           @Nullable ProgressListener listener,
           final ProcessMonitor monitor) throws IOException {
       checkNotNull(builder);
 
       if (listener != null) {
-        try (ProgressParser progressParser = createProgressParser(listener)) {
+          final ProgressParser progressParser = createProgressParser(listener);
           progressParser.start();
           builder = builder.addProgress(progressParser.getUri());
 
-          run(builder.build(), monitor);
-        }
+          return run(builder.build(), monitor, progressParser);
       } else {
-        run(builder.build(), monitor);
+          return run(builder.build(), monitor, null);
       }
     }
   

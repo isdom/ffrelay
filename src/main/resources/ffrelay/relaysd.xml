@@ -15,6 +15,7 @@
         <property name="infos" ref="infos"/>
         <property name="destPullUri" value="${dest.pulluri}"/>
         <property name="apiPath" ref="apiPath"/>
+        <property name="liveInfoExpiredInMS" ref="liveInfoExpiredInMS"/>
     </bean>
     
     <bean class="org.springframework.jmx.export.MBeanExporter"

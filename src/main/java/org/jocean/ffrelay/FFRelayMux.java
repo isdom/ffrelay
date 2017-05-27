@@ -28,8 +28,8 @@ import net.bramp.ffmpeg.progress.Progress;
 import net.bramp.ffmpeg.progress.ProgressListener;
 
 public class FFRelayMux implements BeanHolderAware {
-    private final static Logger LOG = 
-            LoggerFactory.getLogger(FFRelayMux.class);
+//    private final static Logger LOG = 
+//            LoggerFactory.getLogger(FFRelayMux.class);
     
     private final Logger OUT;
     private static final PeriodFormatter PERIODFMT = new PeriodFormatterBuilder()

@@ -1,28 +1,29 @@
 package net.bramp.ffmpeg;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
-import com.google.common.io.CharStreams;
-import net.bramp.ffmpeg.io.ProcessUtils;
-import net.bramp.ffmpeg.progress.Progress;
-
-import javax.annotation.Nonnull;
-
-import org.jocean.ffrelay.FFRelay;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import javax.annotation.Nonnull;
+
+import org.jocean.idiom.io.LineBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
+import com.google.common.io.CharStreams;
+
+import net.bramp.ffmpeg.io.ProcessUtils;
+import net.bramp.ffmpeg.progress.ProgressParser;
 
 /** Private class to contain common methods for both FFmpeg and FFprobe. */
 abstract class FFcommon {
@@ -134,9 +135,11 @@ abstract class FFcommon {
    * Runs the binary (ffmpeg) with the supplied args. Blocking until finished.
    *
    * @param args The arguments to pass to the binary.
+   * @param progressParser 
    * @throws IOException If there is a problem executing the binary.
    */
-  public void run(final List<String> args, final ProcessMonitor monitor) throws IOException {
+  public Callable<Boolean> run(final List<String> args, final ProcessMonitor monitor, final ProgressParser progressParser) 
+          throws IOException {
     checkNotNull(args);
 
     final Process p = runFunc.run(path(args));
@@ -146,26 +149,60 @@ abstract class FFcommon {
     } catch (Exception e) {
     }
     
-    try {
-      // TODO Move the copy onto a thread, so that FFmpegProgressListener can be on this thread.
-
-      // Now block reading ffmpeg's stdout. We are effectively throwing away the output.
-      // CharStreams.copy(wrapInReader(p), System.out); // TODO Should I be outputting to stdout?
-
-      final BufferedReader in = wrapInReader(p);
-      
-      String line;
-      while ((line = in.readLine()) != null) {
-          try {
-              monitor.onOutput(line);
-          } catch (Exception e) {
-          }
-      }
-      
-      throwOnError(p);
-
-    } finally {
-      p.destroy();
-    }
-  }
+    // TODO Move the copy onto a thread, so that FFmpegProgressListener can
+    // be on this thread.
+    
+    // Now block reading ffmpeg's stdout. We are effectively throwing away
+    // the output.
+    // CharStreams.copy(wrapInReader(p), System.out); // TODO Should I be
+    // outputting to stdout?
+    
+    final BufferedReader in = wrapInReader(p);
+    final char[] cbuf = new char[64];
+    final LineBuffer lineBuf = new LineBuffer() {
+        @Override
+        protected void handleLine(final String line, final String end) throws IOException {
+            try {
+                monitor.onOutput(line);
+            } catch (Exception e) {
+            }
+        }
+    };
+    
+    return new Callable<Boolean>() {
+        @Override
+        public Boolean call() {
+            try {
+                if (in.ready()) {
+                    final int readcnt = in.read(cbuf);
+                    if (readcnt > 0) {
+                        lineBuf.add(cbuf, 0, readcnt);
+                        // true means process NOT ended
+                        return false;
+                    }
+//                    if (-1 == readcnt) {
+                    lineBuf.finish();
+                    progressParser.close();
+                    throwOnError(p);
+                    // true means process ended
+                    return true;
+//                    }
+                }
+            } catch (Exception e) {
+                try {
+                    lineBuf.finish();
+                } catch (IOException e1) {
+                }
+                try {
+                    progressParser.close();
+                } catch (IOException e1) {
+                }
+                p.destroy();
+                throw new RuntimeException(e);
+            }
+            // true means process ended
+            return true;
+        }
+    };
+}
 }

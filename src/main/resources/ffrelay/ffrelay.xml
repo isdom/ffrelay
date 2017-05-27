@@ -20,6 +20,11 @@
         <constructor-arg value="${api.path}"/>
     </bean>
     
+    <bean id="liveInfoExpiredInMS" class="java.lang.Long">
+        <constructor-arg value="${api.expiredms:60000}"/>
+    </bean>
+    
+    
     <bean class="org.springframework.jmx.export.MBeanExporter"
           lazy-init="false">
         <property name="beans">
