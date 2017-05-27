@@ -182,7 +182,9 @@ abstract class FFcommon {
                     }
 //                    if (-1 == readcnt) {
                     lineBuf.finish();
-                    progressParser.close();
+                    if (null!=progressParser) {
+                        progressParser.close();
+                    }
                     throwOnError(p);
                     // true means process ended
                     return true;
@@ -194,7 +196,9 @@ abstract class FFcommon {
                 } catch (IOException e1) {
                 }
                 try {
-                    progressParser.close();
+                    if (null!=progressParser) {
+                        progressParser.close();
+                    }
                 } catch (IOException e1) {
                 }
                 p.destroy();
