@@ -158,7 +158,7 @@ abstract class FFcommon {
     // outputting to stdout?
     
     final BufferedReader in = wrapInReader(p);
-    final char[] cbuf = new char[64];
+    final char[] cbuf = new char[256];
     final LineBuffer lineBuf = new LineBuffer() {
         @Override
         protected void handleLine(final String line, final String end) throws IOException {
@@ -173,20 +173,31 @@ abstract class FFcommon {
         @Override
         public Boolean call() {
             try {
-                while (in.ready()) {
+                while (p.isAlive() && in.ready()) {
                     final int readcnt = in.read(cbuf);
                     if (readcnt > 0) {
                         lineBuf.add(cbuf, 0, readcnt);
                     }
-                    if (-1 == readcnt) {
-                        lineBuf.finish();
-                        if (null!=progressParser) {
-                            progressParser.close();
-                        }
-                        throwOnError(p);
-                        // true means process ended
-                        return true;
+                    LOG.debug("read stdout {} chars", readcnt);
+//                    if (-1 == readcnt) {
+//                        lineBuf.finish();
+//                        if (null!=progressParser) {
+//                            progressParser.close();
+//                        }
+//                        throwOnError(p);
+//                        // true means process ended
+//                        return true;
+//                    }
+                }
+                LOG.debug("read stdout ended");
+                if (!p.isAlive()) {
+                    lineBuf.finish();
+                    if (null!=progressParser) {
+                        progressParser.close();
                     }
+                    throwOnError(p);
+                    // true means process ended
+                    return true;
                 }
                 // false means process NOT ended
                 return false;
