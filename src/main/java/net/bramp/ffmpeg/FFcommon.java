@@ -178,18 +178,7 @@ abstract class FFcommon {
                     if (readcnt > 0) {
                         lineBuf.add(cbuf, 0, readcnt);
                     }
-                    LOG.debug("read stdout {} chars", readcnt);
-//                    if (-1 == readcnt) {
-//                        lineBuf.finish();
-//                        if (null!=progressParser) {
-//                            progressParser.close();
-//                        }
-//                        throwOnError(p);
-//                        // true means process ended
-//                        return true;
-//                    }
                 }
-                LOG.debug("read stdout ended");
                 if (!p.isAlive()) {
                     lineBuf.finish();
                     if (null!=progressParser) {
