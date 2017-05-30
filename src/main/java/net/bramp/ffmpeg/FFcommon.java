@@ -7,9 +7,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.annotation.Nonnull;
 
@@ -24,6 +24,7 @@ import com.google.common.io.CharStreams;
 
 import net.bramp.ffmpeg.io.ProcessUtils;
 import net.bramp.ffmpeg.progress.ProgressParser;
+import rx.functions.Action1;
 
 /** Private class to contain common methods for both FFmpeg and FFprobe. */
 abstract class FFcommon {
@@ -138,16 +139,12 @@ abstract class FFcommon {
    * @param progressParser 
    * @throws IOException If there is a problem executing the binary.
    */
-  public Callable<Boolean> run(final List<String> args, final ProcessMonitor monitor, final ProgressParser progressParser) 
+  public ProcessFacade start(final List<String> args, 
+          final ProgressParser progressParser) 
           throws IOException {
     checkNotNull(args);
 
     final Process p = runFunc.run(path(args));
-    
-    try {
-        monitor.setProcess(p);
-    } catch (Exception e) {
-    }
     
     // TODO Move the copy onto a thread, so that FFmpegProgressListener can
     // be on this thread.
@@ -159,19 +156,30 @@ abstract class FFcommon {
     
     final BufferedReader in = wrapInReader(p);
     final char[] cbuf = new char[256];
+    final AtomicReference<Action1<String>> actionRef = new AtomicReference<>();
     final LineBuffer lineBuf = new LineBuffer() {
         @Override
         protected void handleLine(final String line, final String end) throws IOException {
             try {
-                monitor.onOutput(line);
+                final Action1<String> action = actionRef.get();
+                if (null != action) {
+                    action.call(line);
+                }
             } catch (Exception e) {
             }
         }
     };
     
-    return new Callable<Boolean>() {
+    return new ProcessFacade() {
         @Override
-        public Boolean call() {
+        public void shutdown() {
+            p.destroyForcibly();
+        }
+
+        @Override
+        public boolean readStdout(final Action1<String> online) {
+            // set current action
+            actionRef.set(online);
             try {
                 while (p.isAlive() && in.ready()) {
                     final int readcnt = in.read(cbuf);
@@ -203,6 +211,8 @@ abstract class FFcommon {
                 }
                 p.destroy();
                 throw new RuntimeException(e);
+            } finally {
+                actionRef.set(null);
             }
         }
     };

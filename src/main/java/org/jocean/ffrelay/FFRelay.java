@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 
 import net.bramp.ffmpeg.FFmpeg;
 import net.bramp.ffmpeg.FFmpegExecutor;
-import net.bramp.ffmpeg.ProcessMonitor;
 import net.bramp.ffmpeg.builder.FFmpegBuilder;
 import net.bramp.ffmpeg.builder.FFmpegBuilder.Verbosity;
 import net.bramp.ffmpeg.job.FFmpegJob;
@@ -88,6 +87,7 @@ public class FFRelay implements Relay {
                     }
                 });
                 
+                /* TODO using FFcommon.start
                 job.run(new ProcessMonitor() {
                     @Override
                     public void setProcess(final Process p) {
@@ -115,6 +115,7 @@ public class FFRelay implements Relay {
                         }
                         
                     }});
+                    */
             } catch (Exception e) {
                 OUT.warn("relay stopped bcs of {}", ExceptionUtils.exception2detail(e));
                 if (this._running) {

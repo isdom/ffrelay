@@ -3,7 +3,6 @@ package org.jocean.ffrelay.shuidi;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -28,11 +27,12 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import net.bramp.ffmpeg.FFmpeg;
-import net.bramp.ffmpeg.ProcessMonitor;
+import net.bramp.ffmpeg.ProcessFacade;
 import net.bramp.ffmpeg.builder.FFmpegBuilder;
 import net.bramp.ffmpeg.builder.FFmpegBuilder.Verbosity;
 import net.bramp.ffmpeg.progress.Progress;
 import net.bramp.ffmpeg.progress.ProgressListener;
+import rx.functions.Action1;
 
 public class FFRelaySD implements Relay {
     private static SslContext initSSLCtx() {
@@ -103,11 +103,11 @@ public class FFRelaySD implements Relay {
                     callGetInfoAndPlay();
                 }
                 
-                if (null != this._checkRelay) {
+                if (null != this._relayProcess) {
                     doCheckRelay();
                 }
                 
-                if ( null == this._checkRelay
+                if ( null == this._relayProcess
                     && null != this._rtmpurl ) {
                     startRelay();
                 }
@@ -129,44 +129,14 @@ public class FFRelaySD implements Relay {
             .done();
             
         try {
-            this._checkRelay = 
-                this._ffmpeg.run(builder, buildProgressListener(), buildProcessMonitor());
+            this._relayProcess = 
+                this._ffmpeg.start(builder, buildProgressListener());
         } catch (IOException e) {
             OUT.warn("failed to start relay from {} --> to {}, detail: {}", 
                 this._rtmpurl, this._dest,
                 ExceptionUtils.exception2detail(e));
         }
         
-    }
-
-    private ProcessMonitor buildProcessMonitor() {
-        return new ProcessMonitor() {
-                @Override
-                public void setProcess(final Process p) {
-                    _relayProcess = p;
-                    OUT.info("current process has been set: {}", _relayProcess);
-                }
-
-                @Override
-                public void onOutput(final String line) {
-                    _lastOutputTime = System.currentTimeMillis();
-                    _lastOutput = line;
-                    OUT.info(line);
-                    if (null!=_status) {
-                        _status.put(_name, line);
-                    }
-                    if (line.indexOf("invalid dropping") >= 0) {
-                        OUT.warn("meet 'invalid dropping' output, so try re-start ffmpeg");
-                        _relayProcess.destroyForcibly();
-                        return;
-                    }
-                    if (line.indexOf("Non-monotonous DTS") >= 0) {
-                        OUT.warn("meet 'Non-monotonous DTS' output, so try re-start ffmpeg");
-                        _relayProcess.destroyForcibly();
-                        return;
-                    }
-                }
-            };
     }
 
     private ProgressListener buildProgressListener() {
@@ -183,7 +153,26 @@ public class FFRelaySD implements Relay {
 
     private void doCheckRelay() {
         try {
-            if (this._checkRelay.call()) {
+            if (this._relayProcess.readStdout(new Action1<String>() {
+                @Override
+                public void call(final String line) {
+                    _lastOutputTime = System.currentTimeMillis();
+                    _lastOutput = line;
+                    OUT.info(line);
+                    if (null!=_status) {
+                        _status.put(_name, line);
+                    }
+                    if (line.indexOf("invalid dropping") >= 0) {
+                        OUT.warn("meet 'invalid dropping' output, so try re-start ffmpeg");
+                        _relayProcess.shutdown();
+                        return;
+                    }
+                    if (line.indexOf("Non-monotonous DTS") >= 0) {
+                        OUT.warn("meet 'Non-monotonous DTS' output, so try re-start ffmpeg");
+                        _relayProcess.shutdown();
+                        return;
+                    }
+                }})) {
                 // process ended normal
                 onRelayEnded();
                 OUT.info("relay ended normal, try re-start");
@@ -196,7 +185,6 @@ public class FFRelaySD implements Relay {
 
     private void onRelayEnded() {
         this._relayProcess = null;
-        this._checkRelay = null;
         this._rtmpurl = null;
         this._valid = false;
         this._totalWorkMs += _currentWorkMs;
@@ -240,9 +228,9 @@ public class FFRelaySD implements Relay {
     public synchronized void stop() {
 	    if (this._running) {
             this._running = false;
-	        final Process p = this._relayProcess;
+	        final ProcessFacade p = this._relayProcess;
 	        if (null != p) {
-	            p.destroyForcibly();
+	            p.shutdown();
 	        } else {
 	            OUT.warn("current process is null");
 	        }
@@ -342,6 +330,5 @@ public class FFRelaySD implements Relay {
 	private volatile boolean _running = false; 
 	private volatile String  _rtmpurl = null;
     private volatile long    _lastValidLiveInfoTimestamp = 0;
-	private volatile Process _relayProcess = null;
-	private volatile Callable<Boolean> _checkRelay = null;
+	private volatile ProcessFacade _relayProcess = null;
 }

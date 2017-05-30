@@ -1,13 +1,7 @@
 package net.bramp.ffmpeg.job;
 
-import com.google.common.base.Throwables;
-import net.bramp.ffmpeg.FFmpeg;
-import net.bramp.ffmpeg.ProcessMonitor;
-import net.bramp.ffmpeg.builder.FFmpegBuilder;
-import net.bramp.ffmpeg.job.FFmpegJob.State;
-import net.bramp.ffmpeg.progress.ProgressListener;
+import static com.google.common.base.Preconditions.checkNotNull;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -16,7 +10,13 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import javax.annotation.Nullable;
+
+import com.google.common.base.Throwables;
+
+import net.bramp.ffmpeg.FFmpeg;
+import net.bramp.ffmpeg.builder.FFmpegBuilder;
+import net.bramp.ffmpeg.progress.ProgressListener;
 
 public class TwoPassFFmpegJob extends FFmpegJob {
 
@@ -77,32 +77,4 @@ public class TwoPassFFmpegJob extends FFmpegJob {
       throw new RuntimeException(t);
     }
   }
-  
-  @Override
-  public void run(final ProcessMonitor processAware) {
-      state = State.RUNNING;
-
-      try {
-        try {
-          // Two pass
-          final boolean override = builder.getOverrideOutputFiles();
-
-          FFmpegBuilder b1 = builder.setPass(1).overrideOutputFiles(true);
-          ffmpeg.run(b1, listener, processAware);
-
-          FFmpegBuilder b2 = builder.setPass(2).overrideOutputFiles(override);
-          ffmpeg.run(b2, listener, processAware);
-
-        } finally {
-          deletePassLog();
-        }
-        state = State.FINISHED;
-
-      } catch (Throwable t) {
-        state = State.FAILED;
-
-        Throwables.throwIfUnchecked(t);
-        throw new RuntimeException(t);
-      }
-    }
 }

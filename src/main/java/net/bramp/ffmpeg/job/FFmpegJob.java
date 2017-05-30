@@ -1,12 +1,11 @@
 package net.bramp.ffmpeg.job;
 
-import net.bramp.ffmpeg.FFmpeg;
-import net.bramp.ffmpeg.ProcessMonitor;
-import net.bramp.ffmpeg.progress.ProgressListener;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import javax.annotation.Nullable;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import net.bramp.ffmpeg.FFmpeg;
+import net.bramp.ffmpeg.progress.ProgressListener;
 
 /** @author bramp */
 public abstract class FFmpegJob implements Runnable {
@@ -35,6 +34,4 @@ public abstract class FFmpegJob implements Runnable {
   public State getState() {
     return state;
   }
-  
-  public abstract void run(final ProcessMonitor processAware);
 }

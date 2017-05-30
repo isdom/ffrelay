@@ -1,16 +1,16 @@
 package net.bramp.ffmpeg.job;
 
-import com.google.common.base.Throwables;
-import net.bramp.ffmpeg.FFmpeg;
-import net.bramp.ffmpeg.ProcessMonitor;
-import net.bramp.ffmpeg.builder.FFmpegBuilder;
-import net.bramp.ffmpeg.progress.ProgressListener;
-
-import javax.annotation.Nullable;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.List;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import javax.annotation.Nullable;
+
+import com.google.common.base.Throwables;
+
+import net.bramp.ffmpeg.FFmpeg;
+import net.bramp.ffmpeg.builder.FFmpegBuilder;
+import net.bramp.ffmpeg.progress.ProgressListener;
 
 public class SinglePassFFmpegJob extends FFmpegJob {
 
@@ -47,21 +47,4 @@ public class SinglePassFFmpegJob extends FFmpegJob {
       throw new RuntimeException(t);
     }
   }
-
-  @Override
-  public void run(final ProcessMonitor processAware) {
-
-      state = State.RUNNING;
-
-      try {
-        ffmpeg.run(builder, listener, processAware);
-        state = State.FINISHED;
-
-      } catch (Throwable t) {
-        state = State.FAILED;
-
-        Throwables.throwIfUnchecked(t);
-        throw new RuntimeException(t);
-      }
-    }
 }

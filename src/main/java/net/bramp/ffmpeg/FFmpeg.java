@@ -186,9 +186,9 @@ public class FFmpeg extends FFcommon {
   }
 
   @Override
-  public Callable<Boolean> run(List<String> args, final ProcessMonitor monitor, final ProgressParser progressParser) throws IOException {
+  public ProcessFacade start(List<String> args, final ProgressParser progressParser) throws IOException {
     checkIfFFmpeg();
-    return super.run(args, monitor, progressParser);
+    return super.start(args, progressParser);
   }
   
   public void run(FFmpegBuilder builder) throws IOException {
@@ -210,9 +210,8 @@ public class FFmpeg extends FFcommon {
     }
   }
 
-  public Callable<Boolean> run(FFmpegBuilder builder, 
-          @Nullable ProgressListener listener,
-          final ProcessMonitor monitor) throws IOException {
+  public ProcessFacade start(FFmpegBuilder builder, 
+          @Nullable ProgressListener listener) throws IOException {
       checkNotNull(builder);
 
       if (listener != null) {
@@ -220,9 +219,9 @@ public class FFmpeg extends FFcommon {
           progressParser.start();
           builder = builder.addProgress(progressParser.getUri());
 
-          return run(builder.build(), monitor, progressParser);
+          return start(builder.build(), progressParser);
       } else {
-          return run(builder.build(), monitor, null);
+          return start(builder.build(), null);
       }
     }
   
