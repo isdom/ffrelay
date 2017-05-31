@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 
 import org.jocean.idiom.io.LineBuffer;
+import org.jocean.idiom.os.ProcessFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

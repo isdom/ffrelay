@@ -8,6 +8,7 @@ import net.bramp.ffmpeg.progress.ProgressListener;
 import net.bramp.ffmpeg.progress.ProgressParser;
 import net.bramp.ffmpeg.progress.TcpProgressParser;
 import org.apache.commons.lang3.math.Fraction;
+import org.jocean.idiom.os.ProcessFacade;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
