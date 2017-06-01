@@ -25,6 +25,7 @@ import com.google.common.io.CharStreams;
 
 import net.bramp.ffmpeg.io.ProcessUtils;
 import net.bramp.ffmpeg.progress.ProgressParser;
+import rx.functions.Action0;
 import rx.functions.Action1;
 
 /** Private class to contain common methods for both FFmpeg and FFprobe. */
@@ -143,79 +144,95 @@ abstract class FFcommon {
   public ProcessFacade start(final List<String> args, 
           final ProgressParser progressParser) 
           throws IOException {
-    checkNotNull(args);
+      checkNotNull(args);
 
-    final Process p = runFunc.run(path(args));
+      final Process p = runFunc.run(path(args));
     
-    // TODO Move the copy onto a thread, so that FFmpegProgressListener can
-    // be on this thread.
+        // TODO Move the copy onto a thread, so that FFmpegProgressListener can
+        // be on this thread.
+        
+        // Now block reading ffmpeg's stdout. We are effectively throwing away
+        // the output.
+        // CharStreams.copy(wrapInReader(p), System.out); // TODO Should I be
+        // outputting to stdout?
     
-    // Now block reading ffmpeg's stdout. We are effectively throwing away
-    // the output.
-    // CharStreams.copy(wrapInReader(p), System.out); // TODO Should I be
-    // outputting to stdout?
-    
-    final BufferedReader in = wrapInReader(p);
-    final char[] cbuf = new char[256];
-    final AtomicReference<Action1<String>> actionRef = new AtomicReference<>();
-    final LineBuffer lineBuf = new LineBuffer() {
-        @Override
-        protected void handleLine(final String line, final String end) throws IOException {
+        return fromProcess(p, new Action0() {
+            @Override
+            public void call() {
+                closeParser(progressParser);
+            }});
+   }
+  
+    private void closeParser(final ProgressParser progressParser) {
+        if (null != progressParser) {
             try {
-                final Action1<String> action = actionRef.get();
-                if (null != action) {
-                    action.call(line);
-                }
-            } catch (Exception e) {
+                progressParser.close();
+            } catch (IOException e1) {
             }
         }
-    };
-    
-    return new ProcessFacade() {
-        @Override
-        public void shutdown() {
-            p.destroyForcibly();
-        }
+    }
 
-        @Override
-        public boolean readStdout(final Action1<String> online) {
-            // set current action
-            actionRef.set(online);
-            try {
-                while (p.isAlive() && in.ready()) {
-                    final int readcnt = in.read(cbuf);
-                    if (readcnt > 0) {
-                        lineBuf.add(cbuf, 0, readcnt);
-                    }
-                }
-                if (!p.isAlive()) {
-                    lineBuf.finish();
-                    if (null!=progressParser) {
-                        progressParser.close();
-                    }
-                    throwOnError(p);
-                    // true means process ended
-                    return true;
-                }
-                // false means process NOT ended
-                return false;
-            } catch (Exception e) {
+    private ProcessFacade fromProcess(final Process p, final Action0 onEnd) {
+        final BufferedReader in = wrapInReader(p);
+        final char[] cbuf = new char[256];
+        final AtomicReference<Action1<String>> actionRef = new AtomicReference<>();
+        final LineBuffer lineBuf = new LineBuffer() {
+            @Override
+            protected void handleLine(final String line, final String end) throws IOException {
                 try {
-                    lineBuf.finish();
-                } catch (IOException e1) {
-                }
-                try {
-                    if (null!=progressParser) {
-                        progressParser.close();
+                    final Action1<String> action = actionRef.get();
+                    if (null != action) {
+                        action.call(line);
                     }
-                } catch (IOException e1) {
+                } catch (Exception e) {
                 }
-                p.destroy();
-                throw new RuntimeException(e);
-            } finally {
-                actionRef.set(null);
             }
-        }
-    };
-}
+        };
+
+        final ProcessFacade facade = new ProcessFacade() {
+            @Override
+            public void shutdown() {
+                p.destroyForcibly();
+            }
+
+            @Override
+            public boolean readStdout(final Action1<String> online) {
+                // set current action
+                actionRef.set(online);
+                try {
+                    while (p.isAlive() && in.ready()) {
+                        final int readcnt = in.read(cbuf);
+                        if (readcnt > 0) {
+                            lineBuf.add(cbuf, 0, readcnt);
+                        }
+                    }
+                    if (!p.isAlive()) {
+                        lineBuf.finish();
+                        if (null != onEnd) {
+                            onEnd.call();
+                        }
+                        throwOnError(p);
+                        // true means process ended
+                        return true;
+                    }
+                    // false means process NOT ended
+                    return false;
+                } catch (Exception e) {
+                    try {
+                        lineBuf.finish();
+                    } catch (IOException e1) {
+                    }
+                    if (null != onEnd) {
+                        onEnd.call();
+                    }
+                    p.destroy();
+                    throw new RuntimeException(e);
+                } finally {
+                    actionRef.set(null);
+                }
+            }
+        };
+        return facade;
+    }
+
 }
