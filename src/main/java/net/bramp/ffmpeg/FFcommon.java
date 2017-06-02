@@ -156,7 +156,7 @@ abstract class FFcommon {
         // CharStreams.copy(wrapInReader(p), System.out); // TODO Should I be
         // outputting to stdout?
     
-        return fromProcess(p, new Action0() {
+        return ProcessFacade.Util.fromProcess(p, new Action0() {
             @Override
             public void call() {
                 closeParser(progressParser);
@@ -171,68 +171,4 @@ abstract class FFcommon {
             }
         }
     }
-
-    private ProcessFacade fromProcess(final Process p, final Action0 onEnd) {
-        final BufferedReader in = wrapInReader(p);
-        final char[] cbuf = new char[256];
-        final AtomicReference<Action1<String>> actionRef = new AtomicReference<>();
-        final LineBuffer lineBuf = new LineBuffer() {
-            @Override
-            protected void handleLine(final String line, final String end) throws IOException {
-                try {
-                    final Action1<String> action = actionRef.get();
-                    if (null != action) {
-                        action.call(line);
-                    }
-                } catch (Exception e) {
-                }
-            }
-        };
-
-        final ProcessFacade facade = new ProcessFacade() {
-            @Override
-            public void shutdown() {
-                p.destroyForcibly();
-            }
-
-            @Override
-            public boolean readStdout(final Action1<String> online) {
-                // set current action
-                actionRef.set(online);
-                try {
-                    while (p.isAlive() && in.ready()) {
-                        final int readcnt = in.read(cbuf);
-                        if (readcnt > 0) {
-                            lineBuf.add(cbuf, 0, readcnt);
-                        }
-                    }
-                    if (!p.isAlive()) {
-                        lineBuf.finish();
-                        if (null != onEnd) {
-                            onEnd.call();
-                        }
-                        throwOnError(p);
-                        // true means process ended
-                        return true;
-                    }
-                    // false means process NOT ended
-                    return false;
-                } catch (Exception e) {
-                    try {
-                        lineBuf.finish();
-                    } catch (IOException e1) {
-                    }
-                    if (null != onEnd) {
-                        onEnd.call();
-                    }
-                    p.destroy();
-                    throw new RuntimeException(e);
-                } finally {
-                    actionRef.set(null);
-                }
-            }
-        };
-        return facade;
-    }
-
 }
