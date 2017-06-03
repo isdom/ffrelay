@@ -9,11 +9,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 
 import javax.annotation.Nonnull;
 
-import org.jocean.idiom.io.LineBuffer;
 import org.jocean.idiom.os.ProcessFacade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +24,6 @@ import com.google.common.io.CharStreams;
 import net.bramp.ffmpeg.io.ProcessUtils;
 import net.bramp.ffmpeg.progress.ProgressParser;
 import rx.functions.Action0;
-import rx.functions.Action1;
 
 /** Private class to contain common methods for both FFmpeg and FFprobe. */
 abstract class FFcommon {
@@ -156,7 +153,7 @@ abstract class FFcommon {
         // CharStreams.copy(wrapInReader(p), System.out); // TODO Should I be
         // outputting to stdout?
     
-        return ProcessFacade.Util.fromProcess(p, new Action0() {
+        return ProcessFacade.Util.wrapProcess(p, new Action0() {
             @Override
             public void call() {
                 closeParser(progressParser);
