@@ -1,9 +1,11 @@
 package org.jocean.ffrelay;
 
+import java.io.IOException;
 import java.util.Map;
-import java.util.Timer;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
@@ -11,6 +13,7 @@ import javax.inject.Inject;
 import org.jocean.idiom.BeanHolder;
 import org.jocean.idiom.BeanHolderAware;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.os.ProcessFacade;
 import org.joda.time.Period;
 import org.joda.time.format.PeriodFormatter;
 import org.joda.time.format.PeriodFormatterBuilder;
@@ -18,12 +21,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.bramp.ffmpeg.FFmpeg;
-import net.bramp.ffmpeg.FFmpegExecutor;
 import net.bramp.ffmpeg.builder.FFmpegBuilder;
 import net.bramp.ffmpeg.builder.FFmpegBuilder.Verbosity;
-import net.bramp.ffmpeg.job.FFmpegJob;
 import net.bramp.ffmpeg.progress.Progress;
 import net.bramp.ffmpeg.progress.ProgressListener;
+import rx.functions.Action1;
 
 public class FFRelayMux implements BeanHolderAware {
 //    private final static Logger LOG = 
@@ -69,116 +71,150 @@ public class FFRelayMux implements BeanHolderAware {
             }});
 	}
 	
-	private void doRelay() {
-        while (this._running) {
-            final String relayname = this._sources[this._currentSrcIdx];
-            final Relay relay = this._beanHolder.getBean("relay" + relayname, Relay.class);
-            if (null == relay) {
-                OUT.warn("can not found relay named {}, and try next", relayname);
-                stepSrcIdx();
-                continue;
-            }
-            if (!relay.isValid()) {
-                OUT.warn("relay named {} not valid, and try next", relayname);
-                stepSrcIdx();
-                continue;
-            }
-            OUT.info("relay from {} --> to {}", relay.getDestPullUri(), this._dest);
+    private Future<?> scheduleNextRelay(final long delay, final String infomsg) {
+        return this._runner.schedule(new Runnable() {
+            @Override
+            public void run() {
+                if (null != infomsg) {
+                    OUT.info(infomsg);
+                }
+                doRelay();
+            }},
+            delay, 
+            TimeUnit.MILLISECONDS);
+    }
+    
+    private synchronized void doRelay() {
+        if (this._running) {
             try {
-                final FFmpegBuilder builder =  new FFmpegBuilder()
-                    .setVerbosity(Verbosity.INFO)
-                    .setInput(relay.getDestPullUri())
-                    .addOutput(this._dest)
-                        .setFormat("flv")
-                        .setAudioCodec("copy")
-                        .setVideoCodec("copy")
-                    .done();
-                    
-                final FFmpegExecutor executor = new FFmpegExecutor(this._ffmpeg);
-                final FFmpegJob job = executor.createJob(builder, new ProgressListener() {
-                    @Override
-                    public void progress(final Progress progress) {
-                        final long ts = System.currentTimeMillis();
-                        _currentBeginTimestamp.compareAndSet(0, ts);
-                        _currentWorkMs = ts - _currentBeginTimestamp.get();
-                    }
-                });
+                if (null != this._relayProcess) {
+                    doCheckRelay();
+                }
                 
-                /* TODO using FFcommon.start
-                job.run(new ProcessMonitor() {
-                    @Override
-                    public void setProcess(final Process p) {
-                        _currentProcess = p;
-                        OUT.info("current process has been set: {}", _currentProcess);
-                        _timer.schedule(new TimerTask() {
-                            @Override
-                            public void run() {
-                                p.destroyForcibly();
-                            }}, 1000 * _switchInterval);
-                    }
-
-                    @Override
-                    public void onOutput(final String line) {
-                        _lastOutputTime = System.currentTimeMillis();
-                        _lastOutput = line;
-                        OUT.info(line);
-                        if (null!=_status) {
-                            _status.put(_name, line);
-                        }
-                        if (line.indexOf("invalid dropping") >= 0) {
-                            OUT.warn("meet 'invalid dropping' output, so try re-start ffmpeg");
-                            _currentProcess.destroyForcibly();
-                            return;
-                        }
-                        if (line.indexOf("Non-monotonous DTS") >= 0) {
-                            OUT.warn("meet 'Non-monotonous DTS' output, so try re-start ffmpeg");
-                            _currentProcess.destroyForcibly();
-                            return;
-                        }
-                        
-                    }});
-                    */
-            } catch (Exception e) {
-                OUT.warn("relay stopped bcs of {}", ExceptionUtils.exception2detail(e));
-                if (this._running) {
-                    OUT.info("restart relaying...");
+                if ( null == this._relayProcess) {
+                    startRelay();
                 }
             } finally {
-                _totalWorkMs += _currentWorkMs;
-                _currentWorkMs = 0;
-                _currentBeginTimestamp.set(0);
-                stepSrcIdx();
-                try {
-                    // wait for 3s
-                    Thread.sleep(1000 * 3);
-                } catch (InterruptedException e) {
-                }
+                scheduleNextRelay(1000, null);
             }
         }
     }
 
+    private void startRelay() {
+        final String relayname = this._sources[this._currentSrcIdx];
+        final Relay relay = this._beanHolder.getBean("relay" + relayname, Relay.class);
+        if (null == relay) {
+            OUT.warn("can not found relay named {}, and try next", relayname);
+            stepSrcIdx();
+            return;
+        }
+        if (!relay.isValid()) {
+            OUT.warn("relay named {} not valid, and try next", relayname);
+            stepSrcIdx();
+            return;
+        }
+        OUT.info("relay from {} --> to {}", relay.getDestPullUri(), this._dest);
+        final FFmpegBuilder builder =  new FFmpegBuilder()
+            .setVerbosity(Verbosity.INFO)
+            .setInput(relay.getDestPullUri())
+            .addOutput(this._dest)
+                .setFormat("flv")
+                .setAudioCodec("copy")
+                .setVideoCodec("copy")
+            .done();
+            
+        try {
+            this._relayProcess = 
+                this._ffmpeg.start(builder, buildProgressListener());
+        } catch (IOException e) {
+            OUT.warn("failed to start relay from {} --> to {}, detail: {}", 
+                relay.getDestPullUri(), this._dest,
+                ExceptionUtils.exception2detail(e));
+        }
+    }
+
+    private ProgressListener buildProgressListener() {
+        return new ProgressListener() {
+                @Override
+                public void progress(final Progress progress) {
+                    final long ts = System.currentTimeMillis();
+                    _currentBeginTimestamp.compareAndSet(0, ts);
+                    _currentWorkMs = ts - _currentBeginTimestamp.get();
+                }
+            };
+    }
+    
+    private void doCheckRelay() {
+        if (isCurrentRelayTimeout()) {
+            this._relayProcess.shutdown();
+            onRelayEnded();
+            OUT.info("current relay timeout, step to next relay");
+            return;
+        }
+        try {
+            if (this._relayProcess.readStdout(new Action1<String>() {
+                @Override
+                public void call(final String line) {
+                    _lastOutputTime = System.currentTimeMillis();
+                    _lastOutput = line;
+                    OUT.info(line);
+                    if (null!=_status) {
+                        _status.put(_name, line);
+                    }
+                    if (line.indexOf("invalid dropping") >= 0) {
+                        OUT.warn("meet 'invalid dropping' output, so try re-start ffmpeg");
+                        _relayProcess.shutdown();
+                        return;
+                    }
+                    if (line.indexOf("Non-monotonous DTS") >= 0) {
+                        OUT.warn("meet 'Non-monotonous DTS' output, so try re-start ffmpeg");
+                        _relayProcess.shutdown();
+                        return;
+                    }
+                }})) {
+                // process ended normal
+                onRelayEnded();
+                OUT.info("relay ended normal, try re-start");
+            }
+        } catch (Exception e) {
+            onRelayEnded();
+            OUT.warn("relay ended bcs of {}, try re-start", ExceptionUtils.exception2detail(e));
+        }
+    }
+
+    private boolean isCurrentRelayTimeout() {
+        return System.currentTimeMillis() - this._currentBeginTimestamp.get() > (1000L * this._switchInterval);
+    }
+
+    private void onRelayEnded() {
+        this._relayProcess = null;
+        this._totalWorkMs += _currentWorkMs;
+        this._currentWorkMs = 0;
+        this._currentBeginTimestamp.set(0);
+        stepSrcIdx();
+    }
+    
+    public synchronized void stop() {
+        if (this._running) {
+            this._running = false;
+            final ProcessFacade p = this._relayProcess;
+            if (null != p) {
+                p.shutdown();
+            } else {
+                OUT.warn("current process is null");
+            }
+            this._runner.shutdownNow();
+        } else {
+            OUT.warn("FFRelay not running.");
+        }
+    }
+    
     private void stepSrcIdx() {
         this._currentSrcIdx++;
         if (this._currentSrcIdx >= this._sources.length) {
             this._currentSrcIdx = 0;
         }
     }
-
-    public synchronized void stop() {
-	    if (this._running) {
-	        final Process p = this._currentProcess;
-	        if (null != p) {
-	            this._running = false;
-	            p.destroyForcibly();
-	        } else {
-	            OUT.warn("current process is null");
-	        }
-	        this._runner.shutdownNow();
-	        this._timer.cancel();
-	    } else {
-            OUT.warn("FFRelay not running.");
-	    }
-	}
 
     public String getName() {
         return this._name;
@@ -188,9 +224,6 @@ public class FFRelayMux implements BeanHolderAware {
         final Period period = new Period(System.currentTimeMillis() - this._beginTimestamp - 
                 (_totalWorkMs + _currentWorkMs));
         return PERIODFMT.print(period.normalizedStandard()) + " nonwork";
-//        return Long.toString(System.currentTimeMillis() - this._beginTimestamp) + "/"
-//            + Long.toString(_totalWorkMs + _currentWorkMs);
-        
     }
     
     public String getLastOutputTime() {
@@ -231,12 +264,11 @@ public class FFRelayMux implements BeanHolderAware {
 	private final String[] _sources;
 	private final String _dest;
 	private int _currentSrcIdx = 0;
-	private final ExecutorService _runner = 
-	        Executors.newSingleThreadExecutor();
-	private final Timer _timer = new Timer();
+    private final ScheduledExecutorService _runner = 
+            Executors.newSingleThreadScheduledExecutor();
 	
 	private Map<Object, String> _status;
 	
 	private volatile boolean _running = false; 
-	private volatile Process _currentProcess = null;
+    private volatile ProcessFacade _relayProcess = null;
 }
