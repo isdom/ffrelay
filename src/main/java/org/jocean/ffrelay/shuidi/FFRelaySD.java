@@ -107,6 +107,13 @@ public class FFRelaySD implements Relay {
                     doCheckRelay();
                 }
                 
+                if (null != this._relayProcess
+                    && this._lastProgressTime > 0 
+                    && System.currentTimeMillis() - this._lastProgressTime > this._maxNoProgressInMS) {
+                    this._relayProcess.shutdown();
+                    onRelayEnded();
+                }
+                
                 if ( null == this._relayProcess
                     && null != this._rtmpurl ) {
                     startRelay();
@@ -145,6 +152,7 @@ public class FFRelaySD implements Relay {
                 public void progress(final Progress progress) {
                     final long ts = System.currentTimeMillis();
                     _currentBeginTimestamp.compareAndSet(0, ts);
+                    _lastProgressTime = ts;
                     _currentWorkMs = ts - _currentBeginTimestamp.get();
                     _valid = true;
                 }
@@ -190,6 +198,7 @@ public class FFRelaySD implements Relay {
         this._totalWorkMs += _currentWorkMs;
         this._currentWorkMs = 0;
         this._currentBeginTimestamp.set(0);
+        this._lastProgressTime = 0;
     }
 
     private boolean isLiveInfoExpired() {
@@ -312,6 +321,9 @@ public class FFRelaySD implements Relay {
     private volatile boolean _valid = false;
     private long _beginTimestamp;
     private volatile long _totalWorkMs = 0;
+    
+    private long _maxNoProgressInMS = 10 * 1000;
+    private volatile long _lastProgressTime = 0;
     private final AtomicLong _currentBeginTimestamp = new AtomicLong(0);
     private volatile long _currentWorkMs = 0;
     private volatile long _lastOutputTime = 0;
