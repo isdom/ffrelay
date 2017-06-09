@@ -103,18 +103,18 @@ public class FFRelaySD implements Relay {
                     callGetInfoAndPlay();
                 }
                 
-                if (null != this._relayProcess) {
+                if (null != this._currentRelay) {
                     doCheckRelay();
                 }
                 
-                if (null != this._relayProcess
-                    && this._lastProgressTime > 0 
-                    && System.currentTimeMillis() - this._lastProgressTime > this._maxNoProgressInMS) {
-                    this._relayProcess.shutdown();
+                if (null != this._currentRelay
+                    && this._lastProgressTS > 0 
+                    && System.currentTimeMillis() - this._lastProgressTS > this._maxNoProgressInMS) {
+                    this._currentRelay.shutdown();
                     onRelayEnded();
                 }
                 
-                if ( null == this._relayProcess
+                if ( null == this._currentRelay
                     && null != this._rtmpurl ) {
                     startRelay();
                 }
@@ -136,7 +136,7 @@ public class FFRelaySD implements Relay {
             .done();
             
         try {
-            this._relayProcess = 
+            this._currentRelay = 
                 this._ffmpeg.start(builder, buildProgressListener());
         } catch (IOException e) {
             OUT.warn("failed to start relay from {} --> to {}, detail: {}", 
@@ -151,9 +151,9 @@ public class FFRelaySD implements Relay {
                 @Override
                 public void progress(final Progress progress) {
                     final long ts = System.currentTimeMillis();
-                    _currentBeginTimestamp.compareAndSet(0, ts);
-                    _lastProgressTime = ts;
-                    _currentWorkMs = ts - _currentBeginTimestamp.get();
+                    _currentRelayingStartTS.compareAndSet(0, ts);
+                    _lastProgressTS = ts;
+                    _currentWorkMs = ts - _currentRelayingStartTS.get();
                     _valid = true;
                 }
             };
@@ -161,7 +161,7 @@ public class FFRelaySD implements Relay {
 
     private void doCheckRelay() {
         try {
-            if (this._relayProcess.readStdout(new Action1<String>() {
+            if (this._currentRelay.readStdout(new Action1<String>() {
                 @Override
                 public void call(final String line) {
                     _lastOutputTime = System.currentTimeMillis();
@@ -172,12 +172,12 @@ public class FFRelaySD implements Relay {
                     }
                     if (line.indexOf("invalid dropping") >= 0) {
                         OUT.warn("meet 'invalid dropping' output, so try re-start ffmpeg");
-                        _relayProcess.shutdown();
+                        _currentRelay.shutdown();
                         return;
                     }
                     if (line.indexOf("Non-monotonous DTS") >= 0) {
                         OUT.warn("meet 'Non-monotonous DTS' output, so try re-start ffmpeg");
-                        _relayProcess.shutdown();
+                        _currentRelay.shutdown();
                         return;
                     }
                 }})) {
@@ -192,17 +192,17 @@ public class FFRelaySD implements Relay {
     }
 
     private void onRelayEnded() {
-        this._relayProcess = null;
+        this._currentRelay = null;
         this._rtmpurl = null;
         this._valid = false;
         this._totalWorkMs += _currentWorkMs;
         this._currentWorkMs = 0;
-        this._currentBeginTimestamp.set(0);
-        this._lastProgressTime = 0;
+        this._currentRelayingStartTS.set(0);
+        this._lastProgressTS = 0;
     }
 
     private boolean isLiveInfoExpired() {
-        return System.currentTimeMillis() - this._lastValidLiveInfoTimestamp 
+        return System.currentTimeMillis() - this._lastValidLiveInfoTS 
                 >= this._liveInfoExpiredInMS;
     }
 
@@ -230,14 +230,14 @@ public class FFRelaySD implements Relay {
             this._infos.put(this._sn + "-rtmp", resp.getPlayInfo().getRtmp());
             this._infos.put(this._sn + "-hls", resp.getPlayInfo().getHls());
             this._rtmpurl = resp.getPlayInfo().getRtmp();
-            this._lastValidLiveInfoTimestamp = System.currentTimeMillis();
+            this._lastValidLiveInfoTS = System.currentTimeMillis();
         }
     }
 
     public synchronized void stop() {
 	    if (this._running) {
             this._running = false;
-	        final ProcessFacade p = this._relayProcess;
+	        final ProcessFacade p = this._currentRelay;
 	        if (null != p) {
 	            p.shutdown();
 	        } else {
@@ -323,8 +323,6 @@ public class FFRelaySD implements Relay {
     private volatile long _totalWorkMs = 0;
     
     private long _maxNoProgressInMS = 10 * 1000;
-    private volatile long _lastProgressTime = 0;
-    private final AtomicLong _currentBeginTimestamp = new AtomicLong(0);
     private volatile long _currentWorkMs = 0;
     private volatile long _lastOutputTime = 0;
     private volatile String _lastOutput;
@@ -341,6 +339,8 @@ public class FFRelaySD implements Relay {
 	
 	private volatile boolean _running = false; 
 	private volatile String  _rtmpurl = null;
-    private volatile long    _lastValidLiveInfoTimestamp = 0;
-	private volatile ProcessFacade _relayProcess = null;
+    private volatile long    _lastValidLiveInfoTS = 0;
+	private volatile ProcessFacade _currentRelay = null;
+    private volatile long _lastProgressTS = 0;
+    private final AtomicLong _currentRelayingStartTS = new AtomicLong(0);
 }
